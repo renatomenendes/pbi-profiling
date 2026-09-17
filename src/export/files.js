@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export function writeJson(path, value) {
+export function writeTextAtomic(path, content) {
   const target = resolve(path);
   const directory = dirname(target);
   const temporary = `${target}.tmp-${process.pid}`;
@@ -15,11 +15,7 @@ export function writeJson(path, value) {
   mkdirSync(directory, { recursive: true });
 
   try {
-    writeFileSync(
-      temporary,
-      `${JSON.stringify(value, null, 2)}\n`,
-      'utf-8',
-    );
+    writeFileSync(temporary, content, 'utf-8');
 
     if (existsSync(target)) {
       rmSync(target, { force: true });
@@ -33,4 +29,11 @@ export function writeJson(path, value) {
   }
 
   return target;
+}
+
+export function writeJsonAtomic(path, value) {
+  return writeTextAtomic(
+    path,
+    `${JSON.stringify(value, null, 2)}\n`,
+  );
 }

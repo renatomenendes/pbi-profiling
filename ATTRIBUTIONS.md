@@ -8,11 +8,11 @@
 
 - Repository: https://github.com/JonathanJihwanKim/pbi-lineage-lenz
 - Pinned commit: `7e2c61cac2f5e0ca6e7135df17a6918c89c42aec`
-- Packages used: `@pbi-lineage-lenz/core`, `@pbi-lineage-lenz/viewer`
+- Packages used: `@pbi-lineage-lenz/core`, `@pbi-lineage-lenz/viewer`, `@pbi-lineage-lenz/handoff`
 - License: MIT
 - Copyright: Jihwan Kim
 - Integration: Git submodule at `vendor/pbi-lineage-lenz`; package dependencies resolve from the pinned local source rather than an unpinned registry release.
-- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, graph/lineage, and serializable viewer model.
+- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, graph/lineage, serializable viewer model, and the isolated self-contained lineage handoff embedded inside `profile.html`.
 
 The original MIT license remains applicable to the upstream source. The submodule preserves the upstream repository history and license verbatim.
 
@@ -23,9 +23,9 @@ The original MIT license remains applicable to the upstream source. The submodul
 - Repository: https://github.com/djrien-ai/pbi-doc-generator
 - Evaluated commit: `1141d7c535beb956bf945c5737923ce97f0c161d`
 - License: MIT
-- Intended use: page wireframe and report data-role presentation patterns.
+- Useful reference: page wireframes, report layout presentation and visual data-role documentation.
 
-Any adapted source file will carry a local provenance header identifying the original file and commit.
+The current `pbi-profiling` page wireframe is an original implementation over PBIR position metadata; no `pbi-doc-generator` source code has been copied. Any future adapted source file will carry a local provenance header identifying the original file and commit.
 
 ### pbi-semantic-doc
 
@@ -50,4 +50,4 @@ The integration test contains a minimal textual fixture adapted from `pbi-lineag
 
 ## Project-specific code
 
-The profiling model, evidence classification, value/usage/relevance analysis, onboarding runbook, health model and analytical-opportunity layer are original `pbi-profiling` components unless a source file states otherwise.
+The profiling model, evidence classification, value/usage/relevance analysis, onboarding runbook, health model, page-wireframe renderer, HTML visual system and analytical-opportunity layer are original `pbi-profiling` components unless a source file states otherwise.

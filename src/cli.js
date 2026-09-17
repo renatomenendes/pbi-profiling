@@ -4,21 +4,31 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { buildHandoff } from '@pbi-lineage-lenz/handoff';
+
 import { analyzeProject } from './engine/analyze.js';
-import { writeJson } from './export/json.js';
+import {
+  writeJsonAtomic,
+  writeTextAtomic,
+} from './export/files.js';
 import { buildProfile } from './profile/build.js';
+import { renderReportHtml } from './report/render.js';
 
 const USAGE = `
 pbi-profiling profile <pbip-directory> --output <directory>
 
-Build a read-only profile of a Power BI PBIP project.
+Build a read-only, self-contained profile of a Power BI PBIP project.
+
+Outputs:
+  profile.html  Human-oriented offline runbook.
+  profile.json  Structured profiling contract.
 
 Options:
   -o, --output <directory>  Required output directory.
   -h, --help                Show this help.
 `.trim();
 
-export function runCli(args = process.argv.slice(2)) {
+export async function runCli(args = process.argv.slice(2)) {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
@@ -57,10 +67,28 @@ export function runCli(args = process.argv.slice(2)) {
 
   const result = analyzeProject(target);
   const profile = buildProfile(result);
+  const lineage = await buildHandoff(
+    result.viewerModel,
+    {
+      title:
+        profile.meta.reportName ||
+        profile.meta.modelName ||
+        profile.meta.projectName,
+      strictSize: false,
+    },
+  );
+  const reportHtml = renderReportHtml({
+    profile,
+    lineageHtml: lineage.html,
+  });
   const outputDirectory = resolve(values.output);
-  const outputFile = writeJson(
+  const jsonFile = writeJsonAtomic(
     resolve(outputDirectory, 'profile.json'),
     profile,
+  );
+  const htmlFile = writeTextAtomic(
+    resolve(outputDirectory, 'profile.html'),
+    reportHtml,
   );
 
   process.stdout.write(
@@ -69,11 +97,15 @@ export function runCli(args = process.argv.slice(2)) {
         project: profile.meta.projectName,
         model: profile.meta.modelName,
         report: profile.meta.reportName,
-        output: outputFile,
+        outputs: {
+          html: htmlFile,
+          json: jsonFile,
+        },
         counts: profile.overview.counts,
         health: profile.health.counts,
         sourceResolutionCoverage:
           profile.health.sourceResolutionCoverage,
+        lineageWarnings: lineage.warnings,
       },
       null,
       2,
@@ -89,7 +121,7 @@ const isMainModule =
 
 if (isMainModule) {
   try {
-    process.exitCode = runCli();
+    process.exitCode = await runCli();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`pbi-profiling: ${message}\n`);
