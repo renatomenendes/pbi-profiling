@@ -6,18 +6,21 @@ import { renderSourceResolutionSection } from '../src/report/source-resolution.j
 
 const sourceResolution = {
   methodology: {
+    inlinePolicy:
+      'Inline/model-local columns are excluded from external-source coverage.',
     caveat: 'Resource-level lineage is weaker than physical-column lineage.',
   },
   summary: {
     totalColumns: 50,
-    traceableColumns: 46,
+    traceableColumns: 31,
     physicalColumnResolved: 0,
-    resourceResolved: 44,
+    resourceResolved: 31,
+    inlineColumns: 15,
     computedColumns: 4,
     modelDefinedColumns: 0,
-    unresolvedColumns: 2,
+    unresolvedColumns: 0,
     physicalColumnCoverage: 0,
-    resourceLineageCoverage: 44 / 46,
+    resourceLineageCoverage: 1,
     totalTables: 8,
     externalResourceTables: 4,
     inlineTables: 4,
@@ -33,23 +36,32 @@ const sourceResolution = {
       scope: 'external',
       locatorKinds: ['url'],
     },
+    {
+      table: 'Lookup',
+      system: 'Inline Literal',
+      level: 'resource',
+      scope: 'inline',
+      locatorKinds: [],
+    },
   ],
   columns: [],
 };
 
-test('source resolution section explains both coverage levels without conflating them', () => {
+test('source resolution section separates external and inline lineage', () => {
   const html = renderSourceResolutionSection({ sourceResolution });
 
   assert.match(html, /id="source-resolution"/);
-  assert.match(html, /Lineage até recurso/);
-  assert.match(html, /Lineage até coluna física/);
-  assert.match(html, /95[,.]7%/);
+  assert.match(html, /Lineage externo até recurso/);
+  assert.match(html, /Lineage externo até coluna física/);
+  assert.match(html, /100[,.]0%/);
   assert.match(html, /0[,.]0%/);
+  assert.match(html, /15/);
+  assert.match(html, /Inline\/modelo/);
   assert.match(html, /FactWeb/);
-  assert.match(html, /Web/);
+  assert.match(html, /Lookup/);
 });
 
-test('extended RAG exposes source resolution as an auditable chunk', () => {
+test('extended RAG exposes external and inline source resolution as an auditable chunk', () => {
   const profile = {
     meta: { projectName: 'Project' },
     sourceResolution,
@@ -79,7 +91,8 @@ test('extended RAG exposes source resolution as an auditable chunk', () => {
   const chunk = chunks.find((item) => item.type === 'source_resolution');
 
   assert.ok(chunk);
-  assert.match(chunk.text, /Resource-lineage coverage: 95.7%/);
-  assert.match(chunk.text, /Physical-column coverage: 0%/);
-  assert.equal(chunk.metadata.summary.unresolvedColumns, 2);
+  assert.match(chunk.text, /External resource-lineage coverage: 100%/);
+  assert.match(chunk.text, /External physical-column coverage: 0%/);
+  assert.match(chunk.text, /Inline\/model-local columns: 15/);
+  assert.equal(chunk.metadata.summary.unresolvedColumns, 0);
 });
