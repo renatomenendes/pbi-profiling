@@ -8,101 +8,31 @@ const SEMANTIC_CATEGORIES = [
 
 const DEFAULT_SEMANTIC_TERMS = Object.freeze({
   temporal: [
-    'date',
-    'data',
-    'datetime',
-    'timestamp',
-    'time',
-    'hora',
-    'day',
-    'dia',
-    'month',
-    'mes',
-    'mês',
-    'quarter',
-    'trimestre',
-    'year',
-    'ano',
-    'created',
-    'criado',
-    'updated',
-    'atualizado',
-    'modified',
-    'modificado',
-    'reference',
-    'referencia',
-    'referência',
-    'event',
-    'evento',
+    'date', 'data', 'datetime', 'timestamp', 'time', 'hora',
+    'day', 'dia', 'month', 'mes', 'mês', 'quarter', 'trimestre',
+    'year', 'ano', 'created', 'criado', 'updated', 'atualizado',
+    'modified', 'modificado', 'reference', 'referencia', 'referência',
+    'event', 'evento',
   ],
   state: [
-    'status',
-    'state',
-    'estado',
-    'condition',
-    'condicao',
-    'condição',
-    'stage',
-    'estagio',
-    'estágio',
-    'phase',
-    'fase',
+    'status', 'state', 'estado', 'condition', 'condicao', 'condição',
+    'stage', 'estagio', 'estágio', 'phase', 'fase',
   ],
   duration: [
-    'duration',
-    'duracao',
-    'duração',
-    'elapsed',
-    'tempo',
-    'hour',
-    'hours',
-    'hora',
-    'horas',
-    'minute',
-    'minutes',
-    'minuto',
-    'minutos',
-    'day',
-    'days',
-    'dia',
-    'dias',
-    'age',
-    'aging',
-    'latency',
-    'latencia',
-    'latência',
+    'duration', 'duracao', 'duração', 'elapsed', 'tempo',
+    'hour', 'hours', 'hora', 'horas', 'minute', 'minutes',
+    'minuto', 'minutos', 'day', 'days', 'dia', 'dias',
+    'age', 'aging', 'latency', 'latencia', 'latência',
   ],
   entity: [
-    'id',
-    'key',
-    'chave',
-    'code',
-    'codigo',
-    'código',
-    'name',
-    'nome',
-    'category',
-    'categoria',
-    'type',
-    'tipo',
-    'group',
-    'grupo',
+    'id', 'key', 'chave', 'code', 'codigo', 'código',
+    'name', 'nome', 'category', 'categoria', 'type', 'tipo',
+    'group', 'grupo',
   ],
   freshness: [
-    'updated',
-    'atualizado',
-    'modified',
-    'modificado',
-    'refresh',
-    'refreshed',
-    'ingest',
-    'ingested',
-    'ingestion',
-    'load',
-    'loaded',
-    'carga',
-    'arrival',
-    'chegada',
+    'updated', 'atualizado', 'modified', 'modificado',
+    'refresh', 'refreshed', 'ingest', 'ingested', 'ingestion',
+    'load', 'loaded', 'carga', 'arrival', 'chegada',
   ],
 });
 
@@ -124,10 +54,7 @@ const TEMPORAL_TYPES = new Set([
   'datetime',
 ]);
 
-const TEXT_TYPES = new Set([
-  'string',
-  'text',
-]);
+const TEXT_TYPES = new Set(['string', 'text']);
 
 const SERIES_VISUAL_TYPES = new Set([
   'lineChart',
@@ -178,7 +105,7 @@ function detectSignals(viewerModel, usage, semantics) {
   const columns = viewerModel.columns ?? [];
   const visuals = viewerModel.visuals ?? [];
   const measures = viewerModel.measures ?? [];
-  const columnUsage = new Map(
+  const usageByColumn = new Map(
     (usage.columns ?? []).map((item) => [key(item.table, item.name), item]),
   );
   const relationshipColumns = collectRelationshipColumns(
@@ -188,42 +115,42 @@ function detectSignals(viewerModel, usage, semantics) {
   const temporalColumns = collectColumnSignals(
     columns,
     'temporal',
-    columnUsage,
+    usageByColumn,
     relationshipColumns,
     semantics,
   );
   const stateColumns = collectColumnSignals(
     columns,
     'state',
-    columnUsage,
+    usageByColumn,
     relationshipColumns,
     semantics,
   );
   const durationColumns = collectColumnSignals(
     columns,
     'duration',
-    columnUsage,
+    usageByColumn,
     relationshipColumns,
     semantics,
   );
   const entityColumns = collectColumnSignals(
     columns,
     'entity',
-    columnUsage,
+    usageByColumn,
     relationshipColumns,
     semantics,
   );
   const freshnessColumns = collectColumnSignals(
     columns,
     'freshness',
-    columnUsage,
+    usageByColumn,
     relationshipColumns,
     semantics,
   );
   const numericColumns = collectColumnSignals(
     columns,
     'numeric',
-    columnUsage,
+    usageByColumn,
     relationshipColumns,
     semantics,
   );
@@ -249,10 +176,6 @@ function detectSignals(viewerModel, usage, semantics) {
       evidence: ['visual-type'],
     }));
 
-  const stateTransitionReady = intersectTables(temporalColumns, stateColumns);
-  const entityTemporalReady = intersectTables(temporalColumns, entityColumns);
-  const numericTemporalReady = intersectTables(temporalColumns, numericColumns);
-
   return {
     temporalColumns,
     temporalMeasures,
@@ -263,9 +186,9 @@ function detectSignals(viewerModel, usage, semantics) {
     numericColumns,
     seriesVisuals,
     tableIntersections: {
-      temporalAndState: stateTransitionReady,
-      temporalAndEntity: entityTemporalReady,
-      temporalAndNumeric: numericTemporalReady,
+      temporalAndState: intersectTables(temporalColumns, stateColumns),
+      temporalAndEntity: intersectTables(temporalColumns, entityColumns),
+      temporalAndNumeric: intersectTables(temporalColumns, numericColumns),
     },
     counts: {
       temporalColumns: temporalColumns.length,
@@ -283,7 +206,7 @@ function detectSignals(viewerModel, usage, semantics) {
 function collectColumnSignals(
   columns,
   category,
-  usageByKey,
+  usageByColumn,
   relationshipColumns,
   semantics,
 ) {
@@ -291,7 +214,7 @@ function collectColumnSignals(
     .map((column) => classifyColumnSignal(
       column,
       category,
-      usageByKey,
+      usageByColumn,
       relationshipColumns,
       semantics,
     ))
@@ -301,14 +224,13 @@ function collectColumnSignals(
 function classifyColumnSignal(
   column,
   category,
-  usageByKey,
+  usageByColumn,
   relationshipColumns,
   semantics,
 ) {
-  const observed = usageByKey.get(key(column.table, column.name));
+  const observed = usageByColumn.get(key(column.table, column.name));
   const evidence = [];
   const type = String(column.dataType ?? '');
-  const typeLower = type.toLowerCase();
   const reference = `${column.table}[${column.name}]`;
 
   if (category === 'numeric' && NUMERIC_TYPES.has(type)) {
@@ -328,32 +250,37 @@ function classifyColumnSignal(
 
   if (
     category === 'entity' &&
-    TEXT_TYPES.has(typeLower) &&
+    TEXT_TYPES.has(type.toLowerCase()) &&
     hasGroupingRole(observed?.roles ?? [])
   ) {
     evidence.push('visual-grouping-role');
   }
 
   if (category !== 'numeric') {
-    evidence.push(
-      ...semanticNameEvidence(column.name, category, semantics),
-    );
+    evidence.push(...semanticNameEvidence(column.name, category, semantics));
 
     if (semantics.columnHints.get(reference)?.has(category)) {
       evidence.push('explicit-column-hint');
     }
   }
 
-  if (evidence.length === 0) {
+  const normalizedEvidence = unique(evidence);
+  if (normalizedEvidence.length === 0) {
     return null;
   }
 
-  return signalColumn(
-    column,
-    observed,
+  return {
     category,
-    unique(evidence),
-  );
+    table: column.table,
+    name: column.name,
+    dataType: column.dataType ?? null,
+    visualReferences: observed?.visualReferences ?? 0,
+    pageReferences: observed?.pageReferences ?? 0,
+    roles: observed?.roles ?? [],
+    vias: observed?.vias ?? [],
+    confidence: evidenceConfidence(normalizedEvidence),
+    evidence: normalizedEvidence,
+  };
 }
 
 function semanticNameEvidence(name, category, semantics) {
@@ -397,22 +324,18 @@ function hasGroupingRole(roles) {
 }
 
 function collectRelationshipColumns(relationships) {
-  const columns = new Set();
+  const result = new Set();
 
   for (const relationship of relationships) {
     if (relationship.fromTable && relationship.fromColumn) {
-      columns.add(
-        `${relationship.fromTable}[${relationship.fromColumn}]`,
-      );
+      result.add(`${relationship.fromTable}[${relationship.fromColumn}]`);
     }
     if (relationship.toTable && relationship.toColumn) {
-      columns.add(
-        `${relationship.toTable}[${relationship.toColumn}]`,
-      );
+      result.add(`${relationship.toTable}[${relationship.toColumn}]`);
     }
   }
 
-  return columns;
+  return result;
 }
 
 function buildSemanticConfiguration(profilingConfig) {
@@ -480,7 +403,7 @@ function buildCapabilities(signals) {
         signals.stateColumns.length,
       [
         ...refs(signals.stateColumns),
-        ...signals.tableIntersections.temporalAndState.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
       ],
       'Transition analysis is strongest when repeated observations exist for the same entity.',
     ),
@@ -491,7 +414,7 @@ function buildCapabilities(signals) {
         signals.tableIntersections.temporalAndState.length,
       [
         ...refs(signals.durationColumns),
-        ...signals.tableIntersections.temporalAndState.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
       ],
       'Duration can be explicit or derivable only after row-level grain and ordering are validated.',
     ),
@@ -502,7 +425,7 @@ function buildCapabilities(signals) {
         signals.tableIntersections.temporalAndNumeric.length,
       [
         ...refs(signals.entityColumns),
-        ...signals.tableIntersections.temporalAndNumeric.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndNumeric),
       ],
       'Peer groups must be semantically comparable before deviation scores are meaningful.',
     ),
@@ -530,7 +453,9 @@ function buildCapabilities(signals) {
 }
 
 function buildOpportunities(signals, capabilities) {
-  const capabilityById = new Map(capabilities.map((item) => [item.id, item]));
+  const capabilityById = new Map(
+    capabilities.map((item) => [item.id, item]),
+  );
 
   return [
     opportunity(
@@ -538,12 +463,14 @@ function buildOpportunities(signals, capabilities) {
       'Anomalias pontuais em métricas',
       combineStrength(
         capabilityById.get('temporal-analysis'),
-        signals.numericColumns.length + signals.temporalMeasures.length,
+        signals.tableIntersections.temporalAndNumeric.length * 2 +
+          signals.temporalMeasures.length,
       ),
       [
         ...refs(signals.temporalColumns),
         ...refs(signals.numericColumns),
         ...measureRefs(signals.temporalMeasures),
+        ...tableRefs(signals.tableIntersections.temporalAndNumeric),
       ],
       [
         'Confirm observation grain and cadence.',
@@ -561,7 +488,7 @@ function buildOpportunities(signals, capabilities) {
       [
         ...refs(signals.entityColumns),
         ...refs(signals.temporalColumns),
-        ...signals.tableIntersections.temporalAndEntity.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndEntity),
       ],
       [
         'Define comparable peer groups.',
@@ -579,7 +506,7 @@ function buildOpportunities(signals, capabilities) {
       [
         ...refs(signals.durationColumns),
         ...visualRefs(signals.seriesVisuals),
-        ...signals.tableIntersections.temporalAndState.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
       ],
       [
         'Validate ordered repeated observations per entity.',
@@ -630,6 +557,7 @@ function buildOpportunities(signals, capabilities) {
 function capability(id, title, evidenceStrength, evidence, caveat) {
   const strength = evidenceToStrength(evidenceStrength);
   const normalizedEvidence = unique(evidence);
+
   return {
     id,
     title,
@@ -644,6 +572,7 @@ function capability(id, title, evidenceStrength, evidence, caveat) {
 function opportunity(id, title, strength, evidence, prerequisites) {
   const normalized = clamp(strength);
   const normalizedEvidence = unique(evidence);
+
   return {
     id,
     title,
@@ -657,40 +586,19 @@ function opportunity(id, title, strength, evidence, prerequisites) {
   };
 }
 
-function signalColumn(column, observed, category, evidence) {
-  return {
-    category,
-    table: column.table,
-    name: column.name,
-    dataType: column.dataType ?? null,
-    visualReferences: observed?.visualReferences ?? 0,
-    pageReferences: observed?.pageReferences ?? 0,
-    roles: observed?.roles ?? [],
-    vias: observed?.vias ?? [],
-    confidence: evidenceConfidence(evidence),
-    evidence,
-  };
-}
-
 function evidenceConfidence(evidence) {
   if (
-    evidence.some((item) =>
-      [
-        'explicit-column-hint',
-        'data-type:temporal',
-        'data-type:numeric',
-        'relationship-key',
-      ].includes(item),
-    )
+    evidence.some((item) => [
+      'explicit-column-hint',
+      'data-type:temporal',
+      'data-type:numeric',
+      'relationship-key',
+    ].includes(item))
   ) {
     return 'high';
   }
 
-  if (evidence.length > 0) {
-    return 'medium';
-  }
-
-  return 'none';
+  return evidence.length > 0 ? 'medium' : 'none';
 }
 
 function normalizeIdentifier(value) {
@@ -713,7 +621,9 @@ function usesTimeIntelligence(expression) {
 function intersectTables(left, right) {
   const leftTables = new Set(left.map((item) => item.table));
   return unique(
-    right.map((item) => item.table).filter((table) => leftTables.has(table)),
+    right
+      .map((item) => item.table)
+      .filter((table) => leftTables.has(table)),
   );
 }
 
@@ -729,54 +639,40 @@ function visualRefs(items) {
   return items.map((item) => `visual:${item.page}/${item.visual}`);
 }
 
+function tableRefs(items) {
+  return items.map((table) => `table:${table}`);
+}
+
 function combineStrength(capabilityItem, additionalEvidence) {
   const base = capabilityItem?.strength ?? 0;
-  return clamp(base * 0.7 + evidenceToStrength(additionalEvidence) * 0.3);
+  return clamp(
+    base * 0.7 + evidenceToStrength(additionalEvidence) * 0.3,
+  );
 }
 
 function evidenceToStrength(count) {
-  if (count <= 0) {
-    return 0;
-  }
-  if (count === 1) {
-    return 0.35;
-  }
-  if (count <= 3) {
-    return 0.60;
-  }
-  if (count <= 6) {
-    return 0.80;
-  }
+  if (count <= 0) return 0;
+  if (count === 1) return 0.35;
+  if (count <= 3) return 0.60;
+  if (count <= 6) return 0.80;
   return 1;
 }
 
 function strengthStatus(strength) {
-  if (strength >= 0.75) {
-    return 'strong-structural-support';
-  }
-  if (strength >= 0.40) {
-    return 'partial-structural-support';
-  }
+  if (strength >= 0.75) return 'strong-structural-support';
+  if (strength >= 0.40) return 'partial-structural-support';
   return 'not-observed';
 }
 
 function opportunityStatus(strength) {
-  if (strength >= 0.75) {
-    return 'supported-candidate';
-  }
-  if (strength >= 0.40) {
-    return 'candidate-needs-validation';
-  }
+  if (strength >= 0.75) return 'supported-candidate';
+  if (strength >= 0.40) return 'candidate-needs-validation';
   return 'insufficient-structural-evidence';
 }
 
 function confidenceBand(evidenceCount) {
-  if (evidenceCount >= 5) {
-    return 'high';
-  }
-  if (evidenceCount >= 2) {
-    return 'medium';
-  }
+  if (evidenceCount >= 5) return 'high';
+  if (evidenceCount >= 2) return 'medium';
   return evidenceCount === 1 ? 'low' : 'none';
 }
 
