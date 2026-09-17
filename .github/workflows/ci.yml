@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - 20
+          - 22
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Verify pinned upstream
+        run: test "$(git -C vendor/pbi-lineage-lenz rev-parse HEAD)" = "7e2c61cac2f5e0ca6e7135df17a6918c89c42aec"
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Syntax validation
+        run: npm run check
+
+      - name: Test suite
+        run: npm test
+
+      - name: CLI smoke test
+        run: node ./src/cli.js --help
