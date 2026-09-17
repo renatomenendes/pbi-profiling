@@ -45,6 +45,13 @@ function engineResult() {
         {
           name: 'Fact',
           kind: 'table',
+          physical: {
+            system: 'SQL Server',
+            server: 'server',
+            database: 'database',
+            schema: 'dbo',
+            table: 'Fact',
+          },
         },
       ],
       columns: [
@@ -52,15 +59,25 @@ function engineResult() {
           table: 'Fact',
           name: 'EventDate',
           dataType: 'dateTime',
+          origin: 'source',
           confidence: 'exact',
           sourceless: null,
+          physicalPath: 'database.dbo.Fact.EventDate',
+          physical: {
+            column: 'EventDate',
+          },
         },
         {
           table: 'Fact',
           name: 'Amount',
           dataType: 'double',
+          origin: 'source',
           confidence: 'exact',
           sourceless: null,
+          physicalPath: 'database.dbo.Fact.Amount',
+          physical: {
+            column: 'Amount',
+          },
         },
       ],
       measures: [
@@ -126,6 +143,9 @@ test('profile v2 is portable, evidence-backed and preserves inspectable technica
   assert.equal(profile.overview.counts.measures, 1);
   assert.equal(profile.overview.counts.visuals, 1);
   assert.equal(profile.overview.sourceResolutionCoverage, 1);
+  assert.equal(profile.overview.resourceLineageCoverage, 1);
+  assert.equal(profile.sourceResolution.summary.physicalColumnCoverage, 1);
+  assert.equal(profile.sourceResolution.summary.resourceLineageCoverage, 1);
   assert.equal(profile.report.pages[0].isHidden, false);
   assert.equal(profile.semanticModel.measures[0].expression, 'SUM(Fact[Amount])');
   assert.equal(profile.usage.measures[0].visualReferences, 1);
