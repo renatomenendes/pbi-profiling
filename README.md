@@ -14,13 +14,16 @@ O objetivo é transformar artefatos técnicos de Power BI em um runbook navegáv
 - nunca inferir “valor de negócio” a partir de centralidade técnica;
 - produzir artefatos estruturados para auditoria/automação e uma saída HTML orientada a humanos;
 - manter indicadores explicáveis: componentes, pesos, evidências e caveats permanecem no contrato;
+- funcionar em estações corporativas sem privilégio administrativo e sem instalação de pacotes npm para execução;
 - evoluir por branches e pull requests verificáveis, com CI e testes de contrato.
 
 ## Engine
 
 A leitura técnica do PBIP usa `pbi-lineage-lenz` como engine pinada por commit, via Git submodule. Ela fornece parsing e normalização de TMDL, PBIR, DAX, Power Query/M, fontes físicas, dependências e lineage.
 
-O `pbi-profiling` adiciona a camada de produto: profiling, contexto, onboarding, saúde, relevância analítica, oportunidades e runbook humano.
+O runtime importa diretamente o código-fonte auditado do submodule pinado. Não depende de `node_modules` nem de resolução de pacotes no registry npm.
+
+O `pbi-profiling` adiciona a camada de produto: profiling, contexto, onboarding, saúde, relevância analítica, oportunidades, impacto de manutenção e runbook humano.
 
 Veja `ATTRIBUTIONS.md` para provenance e licenças.
 
@@ -39,32 +42,47 @@ O HTML inclui:
 - páginas e wireframe aproximado do layout;
 - catálogo de medidas e DAX;
 - tabelas, fontes, relacionamentos e Power Query/M;
-- centralidade/ importância estrutural;
+- centralidade/importância estrutural;
 - complexidade explícita por componentes;
 - capacidades e oportunidades analíticas;
-- lineage interativo offline;
+- lineage interativo offline sem bibliotecas externas de runtime;
 - uso direto/transitivo;
 - qualidade e cobertura;
+- manutenção e impacto de mudança;
 - detalhes técnicos sob demanda.
 
-## Execução
+## Execução zero-install
 
-Requisitos: Node.js 20 ou superior e Git com suporte a submodules.
+Requisitos de runtime:
+
+- Node.js 20 ou superior;
+- Git com suporte a submodules;
+- repositório clonado com o submodule pinado.
+
+Não é necessário executar `npm install`, `npm ci`, `npm update` ou instalar qualquer pacote JavaScript na estação.
+
+Clone uma vez:
 
 ```powershell
-npm install
+git clone --recurse-submodules https://github.com/renatomenendes/pbi-profiling.git
+Set-Location .\pbi-profiling
+git submodule update --init --recursive
+```
 
+Execute diretamente com Node:
+
+```powershell
 node .\src\cli.js profile `
     "C:\caminho\para\meu-projeto-pbip" `
     --output ".\output\meu-projeto"
 ```
 
-Ou, depois do package estar disponível no PATH:
+Validações locais também não dependem de npm:
 
 ```powershell
-pbi-profiling profile `
-    "C:\caminho\para\meu-projeto-pbip" `
-    --output ".\output\meu-projeto"
+node .\scripts\check.js
+node .\scripts\test.js
+node .\src\cli.js --help
 ```
 
 ## Contexto de negócio opcional
@@ -78,7 +96,7 @@ pbi-profiling.context.json
 Quando o arquivo está na raiz do projeto analisado, ele é detectado automaticamente. Também pode ser informado explicitamente:
 
 ```powershell
-pbi-profiling profile `
+node .\src\cli.js profile `
     ".\MeuProjeto" `
     --output ".\output" `
     --context ".\documentacao\context.json"
@@ -166,24 +184,15 @@ Uma oportunidade significa somente que a estrutura é compatível. Validação d
 
 ## RAG
 
-`profile.rag.jsonl` contém um chunk autocontido por entidade lógica, incluindo:
+`profile.rag.jsonl` contém chunks autocontidos por entidade lógica, incluindo overview, página, tabela, medida, fonte, relacionamento, findings, oportunidades, contexto e hotspots de manutenção.
 
-- overview;
-- página;
-- tabela;
-- medida;
-- fonte;
-- relacionamento;
-- finding de saúde;
-- oportunidade analítica;
-- contexto de negócio, quando fornecido.
-
-Dependências, uso, complexidade e centralidade já chegam pré-resolvidos; um consumidor downstream não precisa reparsear o DAX para responder perguntas básicas sobre o modelo.
+Dependências, uso, complexidade e centralidade chegam pré-resolvidos; um consumidor downstream não precisa reparsear DAX para responder perguntas básicas sobre o modelo.
 
 ## Privacidade e segurança
 
 - a análise é local e read-only;
 - o HTML não depende de CDN ou rede para abrir;
+- a execução não acessa o registry npm;
 - caminhos absolutos da estação não são persistidos no `profile.json` por padrão;
 - nenhum PBIP ou dado corporativo é necessário no repositório do `pbi-profiling`;
 - texto originado do PBIP é escapado antes de ser incorporado ao HTML;
@@ -191,11 +200,13 @@ Dependências, uso, complexidade e centralidade já chegam pré-resolvidos; um c
 
 ## Desenvolvimento
 
+Os mesmos gates usados pelo runtime podem ser executados sem package manager:
+
 ```powershell
-npm run check
-npm test
+node .\scripts\check.js
+node .\scripts\test.js
 ```
 
-O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, sintaxe, suíte de testes e smoke test do CLI.
+O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes e smoke test do CLI.
 
-O primeiro caso real de validação será o Painel de Disponibilidade Tecnológica UMSP. Até essa etapa, todos os gates usam fixtures sintéticas/open source; nenhum artefato corporativo é versionado neste repositório.
+Os gates públicos usam somente fixtures sintéticas/open source; artefatos corporativos não são versionados neste repositório.
