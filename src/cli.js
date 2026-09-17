@@ -12,7 +12,7 @@ import {
   writeJsonAtomic,
   writeTextAtomic,
 } from './export/files.js';
-import { renderRagJsonl } from './export/rag.js';
+import { renderExtendedRagJsonl } from './export/rag-extended.js';
 import { buildProfile } from './profile/build.js';
 import { renderEnhancedReportHtml } from './report/enhance.js';
 
@@ -100,7 +100,7 @@ export async function runCli(args = process.argv.slice(2)) {
     profile,
     lineageHtml: lineage.html,
   });
-  const ragJsonl = renderRagJsonl(profile);
+  const ragJsonl = renderExtendedRagJsonl(profile);
   const outputDirectory = resolve(values.output);
   const jsonFile = writeJsonAtomic(
     resolve(outputDirectory, 'profile.json'),
@@ -131,6 +131,7 @@ export async function runCli(args = process.argv.slice(2)) {
         sourceResolutionCoverage:
           profile.health.sourceResolutionCoverage,
         complexity: profile.complexity.combined,
+        maintenance: profile.maintenance.summary,
         context: {
           status: profile.context.status,
           source: profile.context.source,
