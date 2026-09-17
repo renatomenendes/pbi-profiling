@@ -6,25 +6,34 @@ import { parseArgs } from 'node:util';
 
 import { buildHandoff } from '@pbi-lineage-lenz/handoff';
 
+import { loadBusinessContext } from './context/load.js';
 import { analyzeProject } from './engine/analyze.js';
 import {
   writeJsonAtomic,
   writeTextAtomic,
 } from './export/files.js';
+import { renderRagJsonl } from './export/rag.js';
 import { buildProfile } from './profile/build.js';
 import { renderReportHtml } from './report/render.js';
 
 const USAGE = `
-pbi-profiling profile <pbip-directory> --output <directory>
+pbi-profiling profile <pbip-directory> --output <directory> [--context <file>]
 
 Build a read-only, self-contained profile of a Power BI PBIP project.
 
 Outputs:
-  profile.html  Human-oriented offline runbook.
-  profile.json  Structured profiling contract.
+  profile.html       Human-oriented offline runbook.
+  profile.json       Structured profiling contract.
+  profile.rag.jsonl  Retrieval-ready chunks for AI/RAG workflows.
+
+Optional business context:
+  If --context is omitted, pbi-profiling looks for
+  <pbip-directory>/pbi-profiling.context.json. Absence is valid and never
+  causes business meaning to be fabricated.
 
 Options:
   -o, --output <directory>  Required output directory.
+  -c, --context <file>      Optional business-context sidecar.
   -h, --help                Show this help.
 `.trim();
 
@@ -37,6 +46,10 @@ export async function runCli(args = process.argv.slice(2)) {
       output: {
         type: 'string',
         short: 'o',
+      },
+      context: {
+        type: 'string',
+        short: 'c',
       },
       help: {
         type: 'boolean',
@@ -66,7 +79,13 @@ export async function runCli(args = process.argv.slice(2)) {
   }
 
   const result = analyzeProject(target);
-  const profile = buildProfile(result);
+  const businessContext = loadBusinessContext(
+    result.targetPath,
+    values.context ?? null,
+  );
+  const profile = buildProfile(result, {
+    businessContext,
+  });
   const lineage = await buildHandoff(
     result.viewerModel,
     {
@@ -81,6 +100,7 @@ export async function runCli(args = process.argv.slice(2)) {
     profile,
     lineageHtml: lineage.html,
   });
+  const ragJsonl = renderRagJsonl(profile);
   const outputDirectory = resolve(values.output);
   const jsonFile = writeJsonAtomic(
     resolve(outputDirectory, 'profile.json'),
@@ -89,6 +109,10 @@ export async function runCli(args = process.argv.slice(2)) {
   const htmlFile = writeTextAtomic(
     resolve(outputDirectory, 'profile.html'),
     reportHtml,
+  );
+  const ragFile = writeTextAtomic(
+    resolve(outputDirectory, 'profile.rag.jsonl'),
+    ragJsonl,
   );
 
   process.stdout.write(
@@ -100,11 +124,22 @@ export async function runCli(args = process.argv.slice(2)) {
         outputs: {
           html: htmlFile,
           json: jsonFile,
+          rag: ragFile,
         },
         counts: profile.overview.counts,
         health: profile.health.counts,
         sourceResolutionCoverage:
           profile.health.sourceResolutionCoverage,
+        complexity: profile.complexity.combined,
+        context: {
+          status: profile.context.status,
+          source: profile.context.source,
+          warnings: profile.context.warnings.length,
+        },
+        analyticalOpportunities:
+          profile.analytical.opportunities.filter(
+            (item) => item.status !== 'insufficient-structural-evidence',
+          ).length,
         lineageWarnings: lineage.warnings,
       },
       null,
