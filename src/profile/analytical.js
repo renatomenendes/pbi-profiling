@@ -485,7 +485,7 @@ function buildOpportunities(signals, capabilities) {
       ],
     ),
     opportunity(
-      'state-transition-analysis',
+      'state-transition-monitoring',
       'process-behavior',
       'Transições e comportamento de estados',
       transitions?.strength ?? 0,
