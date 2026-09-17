@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@pbi-lineage-lenz/core": "file:vendor/pbi-lineage-lenz/packages/core",
-    "@pbi-lineage-lenz/viewer": "file:vendor/pbi-lineage-lenz/packages/viewer"
+    "@pbi-lineage-lenz/handoff": "file:vendor/pbi-lineage-lenz/packages/handoff",
+    "@pbi-lineage-lenz/viewer": "file:vendor/pbi-lineage-lenz/packages/viewer",
+    "esbuild": "^0.24.0"
   },
   "keywords": [
     "power-bi",
