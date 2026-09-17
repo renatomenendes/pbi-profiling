@@ -8,10 +8,11 @@ O objetivo é transformar artefatos técnicos de Power BI em um runbook navegáv
 
 - reutilizar projetos open source maduros antes de reimplementar capacidades existentes;
 - preservar proveniência e licenças de todo código reutilizado;
-- separar extração, análise, contexto de negócio e apresentação;
+- separar extração, análise, contexto de negócio, configuração heurística e apresentação;
 - manter a inspeção estritamente read-only sobre projetos PBIP;
 - diferenciar fatos extraídos, heurísticas estruturais e contexto humano declarado;
 - nunca inferir “valor de negócio” a partir de centralidade técnica;
+- não embutir vocabulário de um cliente, dashboard ou domínio no núcleo analítico;
 - produzir artefatos estruturados para auditoria/automação e uma saída HTML orientada a humanos;
 - manter indicadores explicáveis: componentes, pesos, evidências e caveats permanecem no contrato;
 - funcionar em estações corporativas sem privilégio administrativo e sem instalação de pacotes npm para execução;
@@ -108,33 +109,83 @@ Exemplo mínimo:
 {
   "schemaVersion": 1,
   "dashboard": {
-    "purpose": "Monitorar disponibilidade operacional.",
+    "purpose": "Acompanhar indicadores de desempenho do processo.",
     "audience": ["Operação", "Gestão"],
-    "operationalUse": ["Acompanhamento diário"],
     "businessQuestions": [
-      "Onde a disponibilidade está degradando?"
+      "Onde os principais indicadores estão se desviando do comportamento esperado?"
     ],
     "refresh": {
-      "cadence": "Horária",
-      "sla": "90 minutos",
-      "timezone": "America/Sao_Paulo"
+      "cadence": "Diária"
     }
   },
   "tables": {
-    "MinhaTabela": {
-      "grain": "Site x timestamp",
-      "businessMeaning": "Histórico de estado por site"
-    }
-  },
-  "measures": {
-    "Medidas[Disponibilidade]": {
-      "businessDefinition": "Percentual de disponibilidade no contexto filtrado"
+    "FactEvents": {
+      "grain": "Entidade x instante de observação",
+      "businessMeaning": "Histórico de observações do processo"
     }
   }
 }
 ```
 
 A ausência do sidecar é válida. Nesse caso, o runbook declara explicitamente que o contexto não foi fornecido, em vez de fabricá-lo.
+
+## Configuração semântica opcional
+
+A relevância analítica funciona sem configuração específica de domínio. Por padrão, o profiler usa:
+
+- tipos de dados;
+- relações do modelo;
+- papéis dos campos nos visuais;
+- padrões DAX;
+- tipos de visual;
+- um vocabulário bilíngue pequeno e genérico para conceitos como data, estado, duração, identificador e freshness.
+
+O núcleo não contém substantivos de negócio como equipamento, cliente, fornecedor, município, câmera, produto ou qualquer outro conceito específico de um projeto.
+
+Quando um domínio utiliza nomes próprios que não podem ser inferidos estruturalmente, um sidecar separado pode acrescentar hints:
+
+```text
+pbi-profiling.config.json
+```
+
+Ele é detectado automaticamente na raiz do PBIP ou pode ser passado por `--config`:
+
+```powershell
+node .\src\cli.js profile `
+    ".\MeuProjeto" `
+    --output ".\output" `
+    --config ".\documentacao\profiling.json"
+```
+
+Exemplo:
+
+```json
+{
+  "schemaVersion": 1,
+  "analysis": {
+    "semanticHints": {
+      "mode": "extend",
+      "terms": {
+        "state": ["mode"],
+        "entity": ["account"]
+      },
+      "columns": {
+        "FactEvents[ObservedAt]": ["temporal"],
+        "FactEvents[AccountCode]": ["entity"]
+      }
+    }
+  }
+}
+```
+
+`extend` preserva a semântica genérica e adiciona vocabulário local. `replace` desativa o vocabulário padrão e usa somente os hints fornecidos. Tipos, relações, papéis de visuais e DAX continuam sendo evidência estrutural em ambos os modos.
+
+Cada sinal analítico registra a base da inferência, por exemplo `data-type:temporal`, `relationship-key`, `visual-grouping-role`, `default-lexicon`, `custom-semantic-term` ou `explicit-column-hint`. O HTML informa se a análise foi genérica ou configurada.
+
+Contexto e configuração são deliberadamente separados:
+
+- `pbi-profiling.context.json` declara significado de negócio;
+- `pbi-profiling.config.json` controla somente heurísticas de profiling.
 
 ## Inteligência de profiling
 
@@ -158,10 +209,10 @@ O modelo e o relatório também recebem indicadores normalizados. Os scores são
 
 ### Relevância analítica
 
-A ferramenta detecta sinais estruturais como:
+A ferramenta detecta sinais estruturais genéricos como:
 
 - colunas temporais;
-- estados/status;
+- estados/estágios;
 - duração/persistência;
 - entidades/grupos;
 - timestamps de freshness;
@@ -196,7 +247,8 @@ Dependências, uso, complexidade e centralidade chegam pré-resolvidos; um consu
 - caminhos absolutos da estação não são persistidos no `profile.json` por padrão;
 - nenhum PBIP ou dado corporativo é necessário no repositório do `pbi-profiling`;
 - texto originado do PBIP é escapado antes de ser incorporado ao HTML;
-- contexto de negócio é carregado localmente e tratado como entrada explícita, nunca inferida.
+- contexto de negócio é carregado localmente e tratado como entrada explícita, nunca inferida;
+- configuração heurística local é reportada como configuração, nunca apresentada como fato extraído.
 
 ## Desenvolvimento
 
