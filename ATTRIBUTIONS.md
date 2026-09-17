@@ -8,13 +8,15 @@
 
 - Repository: https://github.com/JonathanJihwanKim/pbi-lineage-lenz
 - Pinned commit: `7e2c61cac2f5e0ca6e7135df17a6918c89c42aec`
-- Packages used: `@pbi-lineage-lenz/core`, `@pbi-lineage-lenz/viewer`, `@pbi-lineage-lenz/handoff`
+- Source modules used: `packages/core/src` and `packages/viewer/src/viewerModel.js`
 - License: MIT
 - Copyright: Jihwan Kim
-- Integration: Git submodule at `vendor/pbi-lineage-lenz`; package dependencies resolve from the pinned local source rather than an unpinned registry release.
-- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, graph/lineage, serializable viewer model, and the isolated self-contained lineage handoff embedded inside `profile.html`.
+- Integration: Git submodule at `vendor/pbi-lineage-lenz`; runtime imports the audited source directly from the pinned submodule and does not install or resolve npm packages.
+- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, dependency graph/lineage facts and the serializable viewer model.
 
 The original MIT license remains applicable to the upstream source. The submodule preserves the upstream repository history and license verbatim.
+
+The upstream `handoff` package was evaluated and used in earlier development versions, but it is no longer required at runtime because it invokes `esbuild`. The production lineage view is now an original dependency-free renderer in `src/report/lineage.js`, built from the normalized profiling contract. This change allows execution on locked-down corporate workstations without `npm install`.
 
 ## Approved sources for selective adaptation
 
@@ -53,4 +55,4 @@ The integration test contains a minimal textual fixture adapted from `pbi-lineag
 
 ## Project-specific code
 
-The profiling model, evidence classification, usage analysis, structural-importance model, business-context contract, analytical-relevance analysis, onboarding runbook, health model, page-wireframe renderer, HTML visual system and analytical-opportunity layer are original `pbi-profiling` components unless a source file states otherwise.
+The profiling model, evidence classification, usage analysis, structural-importance model, business-context contract, analytical-relevance analysis, onboarding runbook, health model, page-wireframe renderer, dependency-free lineage renderer, HTML visual system and analytical-opportunity layer are original `pbi-profiling` components unless a source file states otherwise.
