@@ -1,8 +1,8 @@
-const TEMPORAL_NAME_RE = /(^|[_\s])(date|data|datetime|timestamp|time|hora|hour|day|dia|month|mes|m[eê]s|year|ano|created|updated|atualiza[cç][aã]o|reference|refer[eê]ncia)([_\s]|$)/i;
-const STATE_NAME_RE = /(^|[_\s])(status|state|estado|situa[cç][aã]o|condition|condi[cç][aã]o|online|offline|sla|flag|faixa|severity|severidade)([_\s]|$)/i;
-const DURATION_NAME_RE = /(^|[_\s])(duration|dura[cç][aã]o|elapsed|tempo|hours?|horas?|minutes?|minutos?|days?|dias?|aging|age|latency|lat[eê]ncia)([_\s]|$)/i;
-const ENTITY_NAME_RE = /(^|[_\s])(site|unidade|unit|device|dispositivo|camera|c[aâ]mera|sensor|asset|ativo|fornecedor|supplier|municipio|munic[ií]pio|region|regi[aã]o|location|local|id|name|nome)([_\s]|$)/i;
-const FRESHNESS_NAME_RE = /(updated|modified|refresh|atualiza[cç][aã]o|ingest|load|carga|timestamp|created)/i;
+const TEMPORAL_NAME_RE = /(^|\s)(date|data|datetime|timestamp|time|hora|hour|day|dia|month|mes|m[eê]s|year|ano|created|updated|atualiza[cç][aã]o|reference|refer[eê]ncia)(\s|$)/i;
+const STATE_NAME_RE = /(^|\s)(status|state|estado|situa[cç][aã]o|condition|condi[cç][aã]o|online|offline|sla|flag|faixa|severity|severidade)(\s|$)/i;
+const DURATION_NAME_RE = /(^|\s)(duration|dura[cç][aã]o|elapsed|tempo|hours?|horas?|minutes?|minutos?|days?|dias?|aging|age|latency|lat[eê]ncia)(\s|$)/i;
+const ENTITY_NAME_RE = /(^|\s)(site|unidade|unit|device|dispositivo|camera|c[aâ]mera|sensor|asset|ativo|fornecedor|supplier|municipio|munic[ií]pio|region|regi[aã]o|location|local|id|name|nome)(\s|$)/i;
+const FRESHNESS_NAME_RE = /(^|\s)(updated|modified|refresh|atualiza[cç][aã]o|ingest|load|carga|timestamp|created)(\s|$)/i;
 
 const NUMERIC_TYPES = new Set([
   'int64',
@@ -42,6 +42,8 @@ export function buildAnalyticalProfile(viewerModel, usage) {
         'Analytical relevance is inferred only from observable schema, DAX, visual bindings and naming/type signals. It does not assert business value or data quality.',
       confidence:
         'Confidence reflects convergence of independent structural signals, not statistical validation on row-level data.',
+      identifierNormalization:
+        'Column names are tokenized across CamelCase, acronym boundaries, snake_case, kebab-case, punctuation and whitespace before semantic name matching.',
     },
     signals,
     capabilities,
@@ -61,17 +63,17 @@ function detectSignals(viewerModel, usage) {
     .filter((column) => isTemporalColumn(column))
     .map((column) => signalColumn(column, columnUsage, 'temporal'));
   const stateColumns = columns
-    .filter((column) => STATE_NAME_RE.test(column.name ?? ''))
+    .filter((column) => nameMatches(column.name, STATE_NAME_RE))
     .map((column) => signalColumn(column, columnUsage, 'state'));
   const durationColumns = columns
-    .filter((column) => DURATION_NAME_RE.test(column.name ?? ''))
+    .filter((column) => nameMatches(column.name, DURATION_NAME_RE))
     .map((column) => signalColumn(column, columnUsage, 'duration'));
   const entityColumns = columns
     .filter((column) => isEntityColumn(column, columnUsage))
     .map((column) => signalColumn(column, columnUsage, 'entity'));
   const freshnessColumns = columns
     .filter((column) =>
-      isTemporalColumn(column) && FRESHNESS_NAME_RE.test(column.name ?? ''),
+      isTemporalColumn(column) && nameMatches(column.name, FRESHNESS_NAME_RE),
     )
     .map((column) => signalColumn(column, columnUsage, 'freshness'));
   const numericColumns = columns
@@ -295,26 +297,28 @@ function buildOpportunities(signals, capabilities) {
 
 function capability(id, title, evidenceStrength, evidence, caveat) {
   const strength = evidenceToStrength(evidenceStrength);
+  const normalizedEvidence = unique(evidence);
   return {
     id,
     title,
     strength,
     status: strengthStatus(strength),
-    confidence: confidenceBand(evidence.length),
-    evidence: unique(evidence),
+    confidence: confidenceBand(normalizedEvidence.length),
+    evidence: normalizedEvidence,
     caveat,
   };
 }
 
 function opportunity(id, title, strength, evidence, prerequisites) {
   const normalized = clamp(strength);
+  const normalizedEvidence = unique(evidence);
   return {
     id,
     title,
     strength: round(normalized),
     status: opportunityStatus(normalized),
-    confidence: confidenceBand(unique(evidence).length),
-    evidence: unique(evidence),
+    confidence: confidenceBand(normalizedEvidence.length),
+    evidence: normalizedEvidence,
     prerequisites,
     caveat:
       'This is a structural analytical opportunity, not evidence that an anomaly model will be useful in production.',
@@ -338,13 +342,14 @@ function signalColumn(column, usageByKey, category) {
 
 function isTemporalColumn(column) {
   return TEMPORAL_TYPES.has(String(column.dataType ?? '')) ||
-    TEMPORAL_NAME_RE.test(column.name ?? '');
+    nameMatches(column.name, TEMPORAL_NAME_RE);
 }
 
 function isEntityColumn(column, usageByKey) {
-  if (ENTITY_NAME_RE.test(column.name ?? '')) {
+  if (nameMatches(column.name, ENTITY_NAME_RE)) {
     return true;
   }
+
   const observed = usageByKey.get(key(column.table, column.name));
   const roleText = (observed?.roles ?? []).join(' ');
   const type = String(column.dataType ?? '').toLowerCase();
@@ -355,7 +360,6 @@ function isEntityColumn(column, usageByKey) {
 }
 
 function columnNameConfidence(column, category) {
-  const name = column.name ?? '';
   const type = String(column.dataType ?? '');
   if (category === 'temporal' && TEMPORAL_TYPES.has(type)) {
     return 'high';
@@ -364,6 +368,20 @@ function columnNameConfidence(column, category) {
     return 'high';
   }
   return 'medium';
+}
+
+function nameMatches(value, expression) {
+  return expression.test(normalizeIdentifier(value));
+}
+
+function normalizeIdentifier(value) {
+  return String(value ?? '')
+    .replace(/([a-zà-öø-ÿ0-9])([A-ZÀ-ÖØ-Þ])/g, '$1 $2')
+    .replace(/([A-ZÀ-ÖØ-Þ]+)([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ])/g, '$1 $2')
+    .replace(/[_\-./\\]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 function usesTimeIntelligence(expression) {
