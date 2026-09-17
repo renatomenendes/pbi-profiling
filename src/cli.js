@@ -14,7 +14,7 @@ import {
 } from './export/files.js';
 import { renderRagJsonl } from './export/rag.js';
 import { buildProfile } from './profile/build.js';
-import { renderReportHtml } from './report/render.js';
+import { renderEnhancedReportHtml } from './report/enhance.js';
 
 const USAGE = `
 pbi-profiling profile <pbip-directory> --output <directory> [--context <file>]
@@ -96,7 +96,7 @@ export async function runCli(args = process.argv.slice(2)) {
       strictSize: false,
     },
   );
-  const reportHtml = renderReportHtml({
+  const reportHtml = renderEnhancedReportHtml({
     profile,
     lineageHtml: lineage.html,
   });
