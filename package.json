@@ -1,0 +1,33 @@
+{
+  "name": "pbi-profiling",
+  "version": "0.1.0",
+  "description": "Human-oriented profiling, documentation and analysis for Power BI PBIP projects.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "pbi-profiling": "./src/cli.js"
+  },
+  "scripts": {
+    "profile": "node ./src/cli.js",
+    "test": "node --test",
+    "check": "node --check ./src/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@pbi-lineage-lenz/core": "2.0.0",
+    "@pbi-lineage-lenz/viewer": "2.0.0"
+  },
+  "keywords": [
+    "power-bi",
+    "pbip",
+    "pbir",
+    "tmdl",
+    "profiling",
+    "documentation",
+    "lineage",
+    "runbook"
+  ],
+  "license": "MIT"
+}
