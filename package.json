@@ -1,6 +1,6 @@
 {
   "name": "pbi-profiling",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Human-oriented profiling, documentation and analysis for Power BI PBIP projects.",
   "type": "module",
   "main": "./src/index.js",
@@ -22,7 +22,7 @@
     "@pbi-lineage-lenz/core": "file:vendor/pbi-lineage-lenz/packages/core",
     "@pbi-lineage-lenz/handoff": "file:vendor/pbi-lineage-lenz/packages/handoff",
     "@pbi-lineage-lenz/viewer": "file:vendor/pbi-lineage-lenz/packages/viewer",
-    "esbuild": "^0.24.0"
+    "esbuild": "0.24.2"
   },
   "keywords": [
     "power-bi",
@@ -32,7 +32,9 @@
     "profiling",
     "documentation",
     "lineage",
-    "runbook"
+    "runbook",
+    "rag",
+    "data-quality"
   ],
   "license": "MIT"
 }

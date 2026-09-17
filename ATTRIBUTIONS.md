@@ -32,9 +32,12 @@ The current `pbi-profiling` page wireframe is an original implementation over PB
 - Repository: https://github.com/ViciusLio/pbi-semantic-doc
 - Evaluated commit: `3e653828e4957ba7fb698ad92b1ff8bf4f791182`
 - License: MIT
-- Intended use: complexity and RAG/documentation output concepts or selectively adapted implementation.
+- References evaluated: documented complexity-index methodology and `pbi_semantic_doc/rag_generator.py` chunk design.
+- Local use:
+  - `src/profile/complexity.js` uses the public complexity-index idea as a conceptual baseline, but implements a different transparent formula with exposed components, DAX nesting, dependencies and structural density;
+  - `src/export/rag.js` adopts the one-logical-entity-per-JSONL-chunk concept, extended with report usage, structural importance, health findings, business context and analytical opportunities.
 
-Any adapted source file will carry a local provenance header identifying the original file and commit.
+Both local files carry provenance headers. No parser, HTML generator or lineage implementation from `pbi-semantic-doc` has been copied.
 
 ## Reference only — no code reuse
 
@@ -50,4 +53,4 @@ The integration test contains a minimal textual fixture adapted from `pbi-lineag
 
 ## Project-specific code
 
-The profiling model, evidence classification, value/usage/relevance analysis, onboarding runbook, health model, page-wireframe renderer, HTML visual system and analytical-opportunity layer are original `pbi-profiling` components unless a source file states otherwise.
+The profiling model, evidence classification, usage analysis, structural-importance model, business-context contract, analytical-relevance analysis, onboarding runbook, health model, page-wireframe renderer, HTML visual system and analytical-opportunity layer are original `pbi-profiling` components unless a source file states otherwise.

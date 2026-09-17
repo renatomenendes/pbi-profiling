@@ -22,13 +22,23 @@ export function text(value, fallback = '—') {
 }
 
 export function number(value, fallback = '—') {
-  return Number.isFinite(Number(value))
-    ? new Intl.NumberFormat('pt-BR').format(Number(value))
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric)
+    ? new Intl.NumberFormat('pt-BR').format(numeric)
     : fallback;
 }
 
 export function percent(value, digits = 0) {
-  if (!Number.isFinite(Number(value))) {
+  if (value === null || value === undefined || value === '') {
+    return '—';
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
     return '—';
   }
 
@@ -36,5 +46,5 @@ export function percent(value, digits = 0) {
     style: 'percent',
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
-  }).format(Number(value));
+  }).format(numeric);
 }

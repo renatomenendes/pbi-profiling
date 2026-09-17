@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/renatomenendes/pbi-profiling/schemas/pbi-profiling.context.schema.json",
+  "title": "pbi-profiling business context",
+  "type": "object",
+  "required": ["schemaVersion"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "dashboard": {
+      "$ref": "#/$defs/dashboard"
+    },
+    "tables": {
+      "$ref": "#/$defs/entityMap"
+    },
+    "measures": {
+      "$ref": "#/$defs/entityMap"
+    },
+    "pages": {
+      "$ref": "#/$defs/entityMap"
+    },
+    "sources": {
+      "$ref": "#/$defs/entityMap"
+    },
+    "notes": {
+      "$ref": "#/$defs/stringArray"
+    }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "team": { "type": "string" },
+        "contact": { "type": "string" }
+      }
+    },
+    "refresh": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cadence": { "type": "string" },
+        "sla": { "type": "string" },
+        "timezone": { "type": "string" }
+      }
+    },
+    "dashboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "purpose": { "type": "string" },
+        "audience": { "$ref": "#/$defs/stringArray" },
+        "owner": { "$ref": "#/$defs/owner" },
+        "operationalUse": { "$ref": "#/$defs/stringArray" },
+        "businessQuestions": { "$ref": "#/$defs/stringArray" },
+        "refresh": { "$ref": "#/$defs/refresh" },
+        "caveats": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "businessMeaning": { "type": "string" },
+        "businessDefinition": { "type": "string" },
+        "purpose": { "type": "string" },
+        "grain": { "type": "string" },
+        "key": { "$ref": "#/$defs/stringArray" },
+        "owner": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "additionalProperties": { "type": "string" } }
+          ]
+        },
+        "criticality": { "type": "string" },
+        "audience": { "$ref": "#/$defs/stringArray" },
+        "operationalUse": { "$ref": "#/$defs/stringArray" },
+        "businessQuestions": { "$ref": "#/$defs/stringArray" },
+        "refresh": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "sla": { "type": "string" },
+        "caveats": { "$ref": "#/$defs/stringArray" },
+        "notes": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "entityMap": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/entity"
+      }
+    }
+  }
+}
