@@ -21,6 +21,12 @@ export {
   renderExtendedRagJsonl,
 } from './export/rag-extended.js';
 export {
+  CONFIG_SCHEMA_VERSION,
+  DEFAULT_CONFIG_FILE,
+  loadProfilingConfig,
+  validateAndNormalizeProfilingConfig,
+} from './config/load.js';
+export {
   CONTEXT_SCHEMA_VERSION,
   DEFAULT_CONTEXT_FILE,
   loadBusinessContext,
