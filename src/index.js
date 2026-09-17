@@ -9,6 +9,7 @@ export { buildContextProfile } from './profile/context.js';
 export { buildHealthProfile } from './profile/health.js';
 export { buildStructuralImportanceProfile } from './profile/importance.js';
 export { buildMaintenanceProfile } from './profile/maintenance.js';
+export { buildSourceResolutionProfile } from './profile/source-resolution.js';
 export { extractPageMetadata } from './profile/pages.js';
 export { buildUsageProfile } from './profile/usage.js';
 export {
@@ -28,3 +29,4 @@ export {
 export { renderEnhancedReportHtml } from './report/enhance.js';
 export { renderReportHtml } from './report/render.js';
 export { buildLineageGraph, renderLineageHtml } from './report/lineage.js';
+export { renderSourceResolutionSection } from './report/source-resolution.js';
