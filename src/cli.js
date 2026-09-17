@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 
 import { analyzeProject } from './engine/analyze.js';
 import { writeJson } from './export/json.js';
@@ -82,7 +83,11 @@ export function runCli(args = process.argv.slice(2)) {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replaceAll('\\', '/')}`) {
+const isMainModule =
+  Boolean(process.argv[1]) &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
   try {
     process.exitCode = runCli();
   } catch (error) {
