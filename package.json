@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "description": "Human-oriented profiling, documentation and analysis for Power BI PBIP projects.",
   "type": "module",
-  "private": false,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "bin": {
     "pbi-profiling": "./src/cli.js"
   },
   "scripts": {
     "profile": "node ./src/cli.js",
     "test": "node --test",
-    "check": "node --check ./src/cli.js"
+    "check": "node ./scripts/check.js"
   },
   "engines": {
     "node": ">=20"
