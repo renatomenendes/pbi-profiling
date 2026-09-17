@@ -1,5 +1,5 @@
-import { analyzeFromFiles } from '@pbi-lineage-lenz/core';
-import { toViewerModel } from '@pbi-lineage-lenz/viewer';
+import { analyzeFromFiles } from '../../vendor/pbi-lineage-lenz/packages/core/src/index.js';
+import { toViewerModel } from '../../vendor/pbi-lineage-lenz/packages/viewer/src/viewerModel.js';
 
 import { loadProject } from '../io/project.js';
 import { extractPageMetadata } from '../profile/pages.js';
