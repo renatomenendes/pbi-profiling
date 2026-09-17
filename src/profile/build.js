@@ -1,9 +1,18 @@
+import { buildAnalyticalProfile } from './analytical.js';
+import { buildComplexityProfile } from './complexity.js';
+import { buildContextProfile } from './context.js';
 import { buildHealthProfile } from './health.js';
+import { buildStructuralImportanceProfile } from './importance.js';
 import { buildUsageProfile } from './usage.js';
 
-export const PROFILE_SCHEMA_VERSION = 1;
+export const PROFILE_SCHEMA_VERSION = 2;
 
-export function buildProfile(engineResult) {
+export function buildProfile(
+  engineResult,
+  {
+    businessContext = null,
+  } = {},
+) {
   const {
     analysis,
     note,
@@ -14,6 +23,18 @@ export function buildProfile(engineResult) {
   } = engineResult;
 
   const usage = buildUsageProfile(viewerModel);
+  const pages = mergePages(
+    viewerModel.pages ?? [],
+    pageMetadata ?? [],
+  );
+  const importance = buildStructuralImportanceProfile(viewerModel, usage);
+  const complexity = buildComplexityProfile(viewerModel);
+  const analytical = buildAnalyticalProfile(viewerModel, usage);
+  const context = buildContextProfile(
+    businessContext,
+    viewerModel,
+    pages,
+  );
   const health = buildHealthProfile(
     viewerModel,
     usage,
@@ -21,11 +42,6 @@ export function buildProfile(engineResult) {
       pageMetadata,
       brokenReferences: analysis.graph?.brokenRefs ?? [],
     },
-  );
-
-  const pages = mergePages(
-    viewerModel.pages ?? [],
-    pageMetadata ?? [],
   );
 
   const visualTypes = countBy(
@@ -73,6 +89,8 @@ export function buildProfile(engineResult) {
         (visual) => visual.neverShown,
       ).length,
       sourceResolutionCoverage: health.sourceResolutionCoverage,
+      complexity: complexity.combined,
+      contextStatus: context.status,
     },
     report: {
       pages,
@@ -88,6 +106,10 @@ export function buildProfile(engineResult) {
       sources: viewerModel.sources ?? [],
     },
     usage,
+    importance,
+    complexity,
+    analytical,
+    context,
     health,
     engineStats: sanitizeEngineStats(viewerModel.stats),
   };
