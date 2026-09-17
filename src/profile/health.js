@@ -47,15 +47,15 @@ export function buildHealthProfile(
       severity: 'info',
       title: 'Columns whose lineage terminates in inline/model-local data',
       count: inlineColumns.length,
-      evidence: inlineColumns.map((column) => ({
-        table: column.table,
-        column: column.name,
-        sourceTable:
-          columnResolution.get(`${column.table}\u0000${column.name}`)?.tableResolutionScope === 'inline'
-            ? columnResolution.get(`${column.table}\u0000${column.name}`)?.table ?? column.table
-            : null,
-        reason: column.reason ?? null,
-      })),
+      evidence: inlineColumns.map((column) => {
+        const resolved = columnResolution.get(`${column.table}\u0000${column.name}`);
+        return {
+          table: column.table,
+          column: column.name,
+          sourceTable: resolved?.resolvedViaTable ?? column.table,
+          reason: column.reason ?? null,
+        };
+      }),
     });
   }
 
