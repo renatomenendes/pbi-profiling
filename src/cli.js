@@ -122,8 +122,20 @@ export async function runCli(args = process.argv.slice(2)) {
         },
         counts: profile.overview.counts,
         health: profile.health.counts,
-        sourceResolutionCoverage:
-          profile.health.sourceResolutionCoverage,
+        sourceResolution: {
+          physicalColumnCoverage:
+            profile.sourceResolution.summary.physicalColumnCoverage,
+          resourceLineageCoverage:
+            profile.sourceResolution.summary.resourceLineageCoverage,
+          physicalColumnResolved:
+            profile.sourceResolution.summary.physicalColumnResolved,
+          resourceResolved:
+            profile.sourceResolution.summary.resourceResolved,
+          unresolvedColumns:
+            profile.sourceResolution.summary.unresolvedColumns,
+          computedColumns:
+            profile.sourceResolution.summary.computedColumns,
+        },
         complexity: profile.complexity.combined,
         maintenance: profile.maintenance.summary,
         context: {
