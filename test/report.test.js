@@ -166,8 +166,7 @@ test('runbook is self-contained, navigable, and safe for embedded PBIP text', ()
   assert.equal(html.includes('<link rel="stylesheet"'), false);
   assert.equal(html.includes('</script><script>alert(1)</script>'), false);
   assert.match(html, /\\u003c\/script\\u003e/);
-  assert.match(
-    html,
-    new RegExp(Buffer.from(lineage, 'utf-8').toString('base64')),
-  );
+
+  const lineagePayload = Buffer.from(lineage, 'utf-8').toString('base64');
+  assert.equal(html.includes(lineagePayload), true);
 });
