@@ -13,11 +13,17 @@ function readJson(relativePath) {
 test('published JSON schemas are syntactically valid and aligned with profile v2', () => {
   const profileSchema = readJson('schemas/profile.schema.json');
   const contextSchema = readJson('schemas/pbi-profiling.context.schema.json');
+  const configSchema = readJson('schemas/pbi-profiling.config.schema.json');
   const ragSchema = readJson('schemas/profile.rag.chunk.schema.json');
 
   assert.equal(profileSchema.properties.schemaVersion.const, 2);
   assert.ok(profileSchema.required.includes('maintenance'));
   assert.equal(contextSchema.properties.schemaVersion.const, 1);
+  assert.equal(configSchema.properties.schemaVersion.const, 1);
+  assert.deepEqual(
+    configSchema.properties.analysis.properties.semanticHints.properties.mode.enum,
+    ['extend', 'replace'],
+  );
   assert.ok(ragSchema.properties.type.enum.includes('maintenance_overview'));
   assert.ok(ragSchema.properties.type.enum.includes('maintenance_hotspot'));
 });
