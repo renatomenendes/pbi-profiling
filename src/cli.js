@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { loadProfilingConfig } from './config/load.js';
 import { loadBusinessContext } from './context/load.js';
 import { analyzeProject } from './engine/analyze.js';
 import {
@@ -16,7 +17,7 @@ import { renderEnhancedReportHtml } from './report/enhance.js';
 import { renderLineageHtml } from './report/lineage.js';
 
 const USAGE = `
-pbi-profiling profile <pbip-directory> --output <directory> [--context <file>]
+pbi-profiling profile <pbip-directory> --output <directory> [--context <file>] [--config <file>]
 
 Build a read-only, self-contained profile of a Power BI PBIP project.
 
@@ -34,9 +35,15 @@ Optional business context:
   <pbip-directory>/pbi-profiling.context.json. Absence is valid and never
   causes business meaning to be fabricated.
 
+Optional profiling configuration:
+  If --config is omitted, pbi-profiling looks for
+  <pbip-directory>/pbi-profiling.config.json. Absence is valid. The default
+  analytical semantics remain domain-neutral and deterministic.
+
 Options:
   -o, --output <directory>  Required output directory.
   -c, --context <file>      Optional business-context sidecar.
+  -g, --config <file>       Optional profiling/semantic configuration.
   -h, --help                Show this help.
 `.trim();
 
@@ -53,6 +60,10 @@ export async function runCli(args = process.argv.slice(2)) {
       context: {
         type: 'string',
         short: 'c',
+      },
+      config: {
+        type: 'string',
+        short: 'g',
       },
       help: {
         type: 'boolean',
@@ -86,8 +97,13 @@ export async function runCli(args = process.argv.slice(2)) {
     result.targetPath,
     values.context ?? null,
   );
+  const profilingConfig = loadProfilingConfig(
+    result.targetPath,
+    values.config ?? null,
+  );
   const profile = buildProfile(result, {
     businessContext,
+    profilingConfig,
   });
   const lineageHtml = renderLineageHtml(profile);
   const reportHtml = renderEnhancedReportHtml({
@@ -145,6 +161,8 @@ export async function runCli(args = process.argv.slice(2)) {
           source: profile.context.source,
           warnings: profile.context.warnings.length,
         },
+        analyticalSemantics:
+          profile.analytical.methodology.semanticConfiguration,
         analyticalOpportunities:
           profile.analytical.opportunities.filter(
             (item) => item.status !== 'insufficient-structural-evidence',
