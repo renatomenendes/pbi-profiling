@@ -4,6 +4,7 @@ import { buildContextProfile } from './context.js';
 import { buildHealthProfile } from './health.js';
 import { buildStructuralImportanceProfile } from './importance.js';
 import { buildMaintenanceProfile } from './maintenance.js';
+import { buildSourceResolutionProfile } from './source-resolution.js';
 import { buildUsageProfile } from './usage.js';
 
 export const PROFILE_SCHEMA_VERSION = 2;
@@ -36,12 +37,14 @@ export function buildProfile(
     viewerModel,
     pages,
   );
+  const sourceResolution = buildSourceResolutionProfile(viewerModel);
   const health = buildHealthProfile(
     viewerModel,
     usage,
     {
       pageMetadata,
       brokenReferences: analysis.graph?.brokenRefs ?? [],
+      sourceResolution,
     },
   );
   const maintenance = buildMaintenanceProfile(
@@ -99,6 +102,8 @@ export function buildProfile(
         (visual) => visual.neverShown,
       ).length,
       sourceResolutionCoverage: health.sourceResolutionCoverage,
+      resourceLineageCoverage: sourceResolution.summary.resourceLineageCoverage,
+      sourceResolution: sourceResolution.summary,
       complexity: complexity.combined,
       contextStatus: context.status,
       maintenanceAttention: maintenance.summary,
@@ -116,6 +121,7 @@ export function buildProfile(
       relationships: viewerModel.relationships ?? [],
       sources: viewerModel.sources ?? [],
     },
+    sourceResolution,
     usage,
     importance,
     complexity,

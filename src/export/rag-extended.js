@@ -2,6 +2,30 @@ import { buildRagChunks } from './rag.js';
 
 export function buildExtendedRagChunks(profile) {
   const chunks = buildRagChunks(profile);
+  const sourceResolution = profile.sourceResolution;
+
+  if (sourceResolution) {
+    chunks.push({
+      id: `source-resolution::${profile.meta.projectName}`,
+      type: 'source_resolution',
+      text: [
+        `Source resolution for ${profile.meta.projectName}.`,
+        `Resource-lineage coverage: ${formatPercent(sourceResolution.summary?.resourceLineageCoverage)}.`,
+        `Physical-column coverage: ${formatPercent(sourceResolution.summary?.physicalColumnCoverage)}.`,
+        `Columns resolved to a physical column: ${sourceResolution.summary?.physicalColumnResolved ?? 0}.`,
+        `Columns resolved only to a physical resource: ${sourceResolution.summary?.resourceResolved ?? 0}.`,
+        `Columns still unresolved: ${sourceResolution.summary?.unresolvedColumns ?? 0}.`,
+        `Computed columns excluded from source-lineage denominator: ${sourceResolution.summary?.computedColumns ?? 0}.`,
+        sourceResolution.methodology?.caveat,
+      ].filter(Boolean).join('\n'),
+      metadata: {
+        summary: sourceResolution.summary,
+        methodology: sourceResolution.methodology,
+        tables: sourceResolution.tables,
+      },
+    });
+  }
+
   const maintenance = profile.maintenance;
 
   if (!maintenance) {

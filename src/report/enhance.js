@@ -4,19 +4,21 @@ import {
   renderIntelligenceSection,
 } from './intelligence.js';
 import { renderMaintenanceSection } from './maintenance.js';
+import { renderSourceResolutionSection } from './source-resolution.js';
 
 const NAVIGATION = [
   ['01', 'Visão geral', 'overview'],
   ['02', 'Contexto', 'context'],
   ['03', 'Páginas', 'pages'],
   ['04', 'Métricas', 'metrics'],
-  ['05', 'Dados', 'data'],
-  ['06', 'Inteligência', 'intelligence'],
-  ['07', 'Manutenção', 'maintenance'],
-  ['08', 'Lineage', 'lineage'],
-  ['09', 'Uso', 'usage'],
-  ['10', 'Qualidade', 'quality'],
-  ['11', 'Técnico', 'technical'],
+  ['05', 'Origem', 'source-resolution'],
+  ['06', 'Dados', 'data'],
+  ['07', 'Inteligência', 'intelligence'],
+  ['08', 'Manutenção', 'maintenance'],
+  ['09', 'Lineage', 'lineage'],
+  ['10', 'Uso', 'usage'],
+  ['11', 'Qualidade', 'quality'],
+  ['12', 'Técnico', 'technical'],
 ];
 
 export function renderEnhancedReportHtml({
@@ -32,6 +34,11 @@ export function renderEnhancedReportHtml({
     html,
     'pages',
     renderContextSection(profile),
+  );
+  html = injectBeforeSection(
+    html,
+    'data',
+    renderSourceResolutionSection(profile),
   );
   html = injectBeforeSection(
     html,
