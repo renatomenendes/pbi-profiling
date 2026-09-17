@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/renatomenendes/pbi-profiling/schemas/profile.schema.json",
+  "title": "pbi-profiling profile v2",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "meta",
+    "overview",
+    "report",
+    "semanticModel",
+    "usage",
+    "importance",
+    "complexity",
+    "analytical",
+    "context",
+    "health",
+    "maintenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "meta": {
+      "type": "object",
+      "required": ["projectName", "generatedAt", "engine"],
+      "properties": {
+        "projectName": { "type": "string" },
+        "modelName": { "type": ["string", "null"] },
+        "reportName": { "type": ["string", "null"] },
+        "generatedAt": { "type": "string" },
+        "note": { "type": ["string", "null"] },
+        "engine": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "overview": { "$ref": "#/$defs/object" },
+    "report": {
+      "type": "object",
+      "required": ["pages", "visuals", "bookmarks", "reportMeasures"],
+      "properties": {
+        "pages": { "$ref": "#/$defs/array" },
+        "visuals": { "$ref": "#/$defs/array" },
+        "bookmarks": { "$ref": "#/$defs/array" },
+        "reportMeasures": { "$ref": "#/$defs/array" }
+      },
+      "additionalProperties": true
+    },
+    "semanticModel": {
+      "type": "object",
+      "required": ["tables", "columns", "measures", "relationships", "sources"],
+      "properties": {
+        "tables": { "$ref": "#/$defs/array" },
+        "columns": { "$ref": "#/$defs/array" },
+        "measures": { "$ref": "#/$defs/array" },
+        "relationships": { "$ref": "#/$defs/array" },
+        "sources": { "$ref": "#/$defs/array" }
+      },
+      "additionalProperties": true
+    },
+    "usage": { "$ref": "#/$defs/object" },
+    "importance": {
+      "type": "object",
+      "required": ["methodology", "measures", "tables"],
+      "additionalProperties": true
+    },
+    "complexity": {
+      "type": "object",
+      "required": ["methodology", "combined", "semanticModel", "report", "measures", "hotspots"],
+      "additionalProperties": true
+    },
+    "analytical": {
+      "type": "object",
+      "required": ["methodology", "signals", "capabilities", "opportunities"],
+      "properties": {
+        "methodology": { "$ref": "#/$defs/object" },
+        "signals": { "$ref": "#/$defs/object" },
+        "capabilities": { "$ref": "#/$defs/array" },
+        "opportunities": { "$ref": "#/$defs/array" }
+      },
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "required": ["status", "source", "data", "coverage", "unmatched", "warnings"],
+      "properties": {
+        "status": { "enum": ["provided", "not-provided"] },
+        "source": { "type": ["string", "null"] },
+        "data": { "$ref": "#/$defs/object" },
+        "coverage": { "$ref": "#/$defs/object" },
+        "unmatched": { "$ref": "#/$defs/object" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "health": {
+      "type": "object",
+      "required": ["sourceResolutionCoverage", "findings", "counts"],
+      "additionalProperties": true
+    },
+    "maintenance": {
+      "type": "object",
+      "required": ["methodology", "summary", "documentation", "sourceDependencies", "measures", "hotspots"],
+      "additionalProperties": true
+    },
+    "engineStats": {
+      "type": ["object", "array", "null"]
+    }
+  },
+  "$defs": {
+    "object": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "array": {
+      "type": "array",
+      "items": {}
+    }
+  }
+}
