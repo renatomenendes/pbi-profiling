@@ -2,6 +2,7 @@ import { analyzeFromFiles } from '@pbi-lineage-lenz/core';
 import { toViewerModel } from '@pbi-lineage-lenz/viewer';
 
 import { loadProject } from '../io/project.js';
+import { extractPageMetadata } from '../profile/pages.js';
 
 export function analyzeProject(targetPath) {
   const loaded = loadProject(targetPath);
@@ -20,11 +21,13 @@ export function analyzeProject(targetPath) {
 
   return {
     targetPath: loaded.root,
+    projectName: loaded.projectName,
     note: loaded.note,
     partition: {
       modelName: partition.modelName ?? null,
       reportName: partition.reportName ?? null,
     },
+    pageMetadata: extractPageMetadata(partition.reportFiles),
     analysis,
     viewerModel,
   };
