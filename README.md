@@ -196,6 +196,6 @@ npm run check
 npm test
 ```
 
-O CI valida Node.js 20 e 22, o commit pinado do upstream, sintaxe, suíte de testes e smoke test do CLI.
+O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, sintaxe, suíte de testes e smoke test do CLI.
 
 O primeiro caso real de validação será o Painel de Disponibilidade Tecnológica UMSP. Até essa etapa, todos os gates usam fixtures sintéticas/open source; nenhum artefato corporativo é versionado neste repositório.
