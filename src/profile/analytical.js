@@ -87,6 +87,8 @@ export function buildAnalyticalProfile(
         'Column names are tokenized across CamelCase, acronym boundaries, snake_case, kebab-case, punctuation and whitespace before exact token/phrase matching.',
       semanticPolicy:
         'The built-in vocabulary contains only generic analytical terms. Domain nouns are not embedded in the engine; optional project configuration may extend or replace semantic terms and add explicit column hints.',
+      opportunityPolicy:
+        'Analytical opportunities span descriptive, diagnostic, operational-monitoring, baseline, forecasting and anomaly-detection families. Anomaly detection is one family, not the organizing purpose of the profiler.',
       semanticConfiguration: {
         status: semantics.status,
         source: semantics.source,
@@ -456,16 +458,124 @@ function buildOpportunities(signals, capabilities) {
   const capabilityById = new Map(
     capabilities.map((item) => [item.id, item]),
   );
+  const temporal = capabilityById.get('temporal-analysis');
+  const transitions = capabilityById.get('state-transitions');
+  const persistence = capabilityById.get('persistence-duration');
+  const peers = capabilityById.get('peer-comparison');
+  const freshness = capabilityById.get('freshness-monitoring');
+  const seasonality = capabilityById.get('seasonality');
+  const temporalNumericEvidence =
+    signals.tableIntersections.temporalAndNumeric.length * 2 +
+    signals.temporalMeasures.length;
 
   return [
     opportunity(
+      'trend-analysis',
+      'descriptive',
+      'Tendência e evolução temporal',
+      combineStrength(temporal, signals.seriesVisuals.length),
+      [
+        ...refs(signals.temporalColumns),
+        ...measureRefs(signals.temporalMeasures),
+        ...visualRefs(signals.seriesVisuals),
+      ],
+      [
+        'Confirm which temporal field represents the analytical timeline.',
+        'Validate observation grain and cadence before interpreting changes over time.',
+      ],
+    ),
+    opportunity(
+      'state-transition-analysis',
+      'process-behavior',
+      'Transições e comportamento de estados',
+      transitions?.strength ?? 0,
+      [
+        ...refs(signals.stateColumns),
+        ...refs(signals.temporalColumns),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
+      ],
+      [
+        'Validate the state domain and allowed transitions.',
+        'Establish deterministic ordering for repeated or simultaneous observations.',
+      ],
+    ),
+    opportunity(
+      'duration-persistence-analysis',
+      'process-behavior',
+      'Duração, permanência e persistência',
+      persistence?.strength ?? 0,
+      [
+        ...refs(signals.durationColumns),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
+      ],
+      [
+        'Confirm whether duration is explicit or must be derived from ordered observations.',
+        'Validate event gaps and episode boundaries.',
+      ],
+    ),
+    opportunity(
+      'peer-comparison-analysis',
+      'diagnostic',
+      'Comparação entre entidades e grupos',
+      peers?.strength ?? 0,
+      [
+        ...refs(signals.entityColumns),
+        ...refs(signals.numericColumns),
+        ...tableRefs(signals.tableIntersections.temporalAndNumeric),
+      ],
+      [
+        'Define semantically comparable peer groups.',
+        'Validate cardinality and aggregation grain before ranking or benchmarking.',
+      ],
+    ),
+    opportunity(
+      'freshness-monitoring',
+      'data-operations',
+      'Monitoramento de atualização e atraso',
+      freshness?.strength ?? 0,
+      refs(signals.freshnessColumns),
+      [
+        'Confirm which timestamp represents expected arrival, ingestion or refresh.',
+        'Define expected cadence by source or entity.',
+      ],
+    ),
+    opportunity(
+      'seasonal-baseline',
+      'baseline-modeling',
+      'Baseline sazonal e comportamento esperado',
+      seasonality?.strength ?? 0,
+      [
+        ...refs(signals.temporalColumns),
+        ...visualRefs(signals.seriesVisuals),
+        ...measureRefs(signals.temporalMeasures),
+      ],
+      [
+        'Validate historical depth and regularity.',
+        'Choose the relevant seasonal cycle only after profiling row-level data.',
+      ],
+    ),
+    opportunity(
+      'forecasting-candidate',
+      'forecasting',
+      'Previsão de métricas ao longo do tempo',
+      combineStrength(seasonality, temporalNumericEvidence),
+      [
+        ...refs(signals.temporalColumns),
+        ...refs(signals.numericColumns),
+        ...visualRefs(signals.seriesVisuals),
+        ...tableRefs(signals.tableIntersections.temporalAndNumeric),
+      ],
+      [
+        'Choose a forecast target with clear business semantics.',
+        'Validate historical depth, cadence, missing intervals and regime changes.',
+        'Benchmark against simple seasonal and persistence baselines before using complex models.',
+      ],
+    ),
+    opportunity(
       'point-anomaly',
+      'anomaly-detection',
       'Anomalias pontuais em métricas',
-      combineStrength(
-        capabilityById.get('temporal-analysis'),
-        signals.tableIntersections.temporalAndNumeric.length * 2 +
-          signals.temporalMeasures.length,
-      ),
+      combineStrength(temporal, temporalNumericEvidence),
       [
         ...refs(signals.temporalColumns),
         ...refs(signals.numericColumns),
@@ -480,9 +590,10 @@ function buildOpportunities(signals, capabilities) {
     ),
     opportunity(
       'contextual-anomaly',
+      'anomaly-detection',
       'Anomalias contextuais por entidade/período',
       combineStrength(
-        capabilityById.get('peer-comparison'),
+        peers,
         signals.tableIntersections.temporalAndEntity.length,
       ),
       [
@@ -498,11 +609,9 @@ function buildOpportunities(signals, capabilities) {
     ),
     opportunity(
       'collective-anomaly',
+      'anomaly-detection',
       'Anomalias coletivas e padrões persistentes',
-      combineStrength(
-        capabilityById.get('persistence-duration'),
-        signals.seriesVisuals.length,
-      ),
+      combineStrength(persistence, signals.seriesVisuals.length),
       [
         ...refs(signals.durationColumns),
         ...visualRefs(signals.seriesVisuals),
@@ -513,44 +622,10 @@ function buildOpportunities(signals, capabilities) {
         'Define minimum episode length and gap tolerance.',
       ],
     ),
-    opportunity(
-      'state-transition-monitoring',
-      'Monitoramento de transições de estado',
-      capabilityById.get('state-transitions')?.strength ?? 0,
-      [
-        ...refs(signals.stateColumns),
-        ...refs(signals.temporalColumns),
-      ],
-      [
-        'Validate state domain and allowed transitions.',
-        'Establish deterministic ordering for simultaneous events.',
-      ],
-    ),
-    opportunity(
-      'freshness-anomaly',
-      'Anomalias de atraso/freshness',
-      capabilityById.get('freshness-monitoring')?.strength ?? 0,
-      refs(signals.freshnessColumns),
-      [
-        'Confirm which timestamp represents expected arrival/refresh.',
-        'Define expected cadence by source or entity.',
-      ],
-    ),
-    opportunity(
-      'seasonal-baseline',
-      'Baseline sazonal e desvio esperado',
-      capabilityById.get('seasonality')?.strength ?? 0,
-      [
-        ...refs(signals.temporalColumns),
-        ...visualRefs(signals.seriesVisuals),
-      ],
-      [
-        'Validate historical depth and regularity.',
-        'Choose the relevant seasonal cycle only after profiling row-level data.',
-      ],
-    ),
   ].sort((left, right) =>
-    right.strength - left.strength || left.id.localeCompare(right.id),
+    right.strength - left.strength ||
+    left.family.localeCompare(right.family) ||
+    left.id.localeCompare(right.id),
   );
 }
 
@@ -569,12 +644,20 @@ function capability(id, title, evidenceStrength, evidence, caveat) {
   };
 }
 
-function opportunity(id, title, strength, evidence, prerequisites) {
+function opportunity(
+  id,
+  family,
+  title,
+  strength,
+  evidence,
+  prerequisites,
+) {
   const normalized = clamp(strength);
   const normalizedEvidence = unique(evidence);
 
   return {
     id,
+    family,
     title,
     strength: round(normalized),
     status: opportunityStatus(normalized),
@@ -582,7 +665,7 @@ function opportunity(id, title, strength, evidence, prerequisites) {
     evidence: normalizedEvidence,
     prerequisites,
     caveat:
-      'This is a structural analytical opportunity, not evidence that an anomaly model will be useful in production.',
+      'This is a structural analytical opportunity, not evidence that this analysis will be useful in production.',
   };
 }
 
