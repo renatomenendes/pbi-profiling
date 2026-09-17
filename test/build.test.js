@@ -50,7 +50,15 @@ function engineResult() {
       columns: [
         {
           table: 'Fact',
+          name: 'EventDate',
+          dataType: 'dateTime',
+          confidence: 'exact',
+          sourceless: null,
+        },
+        {
+          table: 'Fact',
           name: 'Amount',
+          dataType: 'double',
           confidence: 'exact',
           sourceless: null,
         },
@@ -63,6 +71,7 @@ function engineResult() {
           dependsOn: {
             measures: [],
             columns: ['Fact[Amount]'],
+            tables: ['Fact'],
           },
         },
       ],
@@ -108,10 +117,10 @@ function engineResult() {
   };
 }
 
-test('profile is portable and preserves inspectable evidence', () => {
+test('profile v2 is portable, evidence-backed and preserves inspectable technical facts', () => {
   const profile = buildProfile(engineResult());
 
-  assert.equal(profile.schemaVersion, 1);
+  assert.equal(profile.schemaVersion, 2);
   assert.equal(profile.meta.projectName, 'Sample');
   assert.equal(profile.overview.counts.tables, 1);
   assert.equal(profile.overview.counts.measures, 1);
@@ -120,6 +129,10 @@ test('profile is portable and preserves inspectable evidence', () => {
   assert.equal(profile.report.pages[0].isHidden, false);
   assert.equal(profile.semanticModel.measures[0].expression, 'SUM(Fact[Amount])');
   assert.equal(profile.usage.measures[0].visualReferences, 1);
+  assert.equal(profile.context.status, 'not-provided');
+  assert.equal(profile.importance.measures.length, 1);
+  assert.equal(profile.complexity.measures.length, 1);
+  assert.ok(profile.analytical.signals.temporalColumns.some((item) => item.name === 'EventDate'));
   assert.equal(profile.targetPath, undefined);
   assert.equal(JSON.stringify(profile).includes('C:/sensitive/local/path'), false);
 });
