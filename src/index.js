@@ -8,6 +8,7 @@ export {
 export { buildContextProfile } from './profile/context.js';
 export { buildHealthProfile } from './profile/health.js';
 export { buildStructuralImportanceProfile } from './profile/importance.js';
+export { buildMaintenanceProfile } from './profile/maintenance.js';
 export { extractPageMetadata } from './profile/pages.js';
 export { buildUsageProfile } from './profile/usage.js';
 export {
