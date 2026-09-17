@@ -1,0 +1,50 @@
+{
+  "$schema": "../schemas/pbi-profiling.context.schema.json",
+  "schemaVersion": 1,
+  "dashboard": {
+    "purpose": "Monitorar um processo operacional e apoiar investigação de desvios.",
+    "audience": [
+      "Operação",
+      "Gestão"
+    ],
+    "owner": {
+      "team": "Equipe responsável"
+    },
+    "operationalUse": [
+      "Acompanhamento diário",
+      "Investigação de incidentes"
+    ],
+    "businessQuestions": [
+      "Onde o indicador está degradando?",
+      "Quais entidades concentram desvios persistentes?"
+    ],
+    "refresh": {
+      "cadence": "Horária",
+      "sla": "90 minutos",
+      "timezone": "America/Sao_Paulo"
+    },
+    "caveats": [
+      "Exemplo genérico: substituir por contexto validado pelo responsável pelo produto."
+    ]
+  },
+  "tables": {
+    "FactEvents": {
+      "grain": "Entidade x timestamp",
+      "key": [
+        "EntityId",
+        "EventTimestamp"
+      ],
+      "businessMeaning": "Histórico de eventos observados."
+    }
+  },
+  "measures": {
+    "Measures[Availability]": {
+      "businessDefinition": "Percentual de disponibilidade no contexto filtrado."
+    }
+  },
+  "pages": {
+    "Overview": {
+      "purpose": "Visão executiva dos principais indicadores."
+    }
+  }
+}
