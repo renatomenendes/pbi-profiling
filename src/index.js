@@ -20,4 +20,5 @@ export {
   loadBusinessContext,
   validateAndNormalizeContext,
 } from './context/load.js';
+export { renderEnhancedReportHtml } from './report/enhance.js';
 export { renderReportHtml } from './report/render.js';
