@@ -1,3 +1,4 @@
+import { percent } from './escape.js';
 import { renderReportHtml } from './render.js';
 import {
   renderContextSection,
@@ -30,6 +31,7 @@ export function renderEnhancedReportHtml({
     lineageHtml,
   });
 
+  html = replaceOverviewSourceCoverage(html, profile);
   html = injectBeforeSection(
     html,
     'pages',
@@ -53,6 +55,46 @@ export function renderEnhancedReportHtml({
   html = replaceNavigation(html);
 
   return html;
+}
+
+function replaceOverviewSourceCoverage(html, profile) {
+  const summary = profile.sourceResolution?.summary;
+  if (!summary) {
+    return html;
+  }
+
+  const pattern = /<article class="card">\s*<div class="kicker">Cobertura de lineage físico<\/div>[\s\S]*?<\/article>/;
+  if (!pattern.test(html)) {
+    throw new Error('Runbook overview source-coverage extension point not found.');
+  }
+
+  const resourceCoverage = summary.resourceLineageCoverage;
+  const physicalCoverage = summary.physicalColumnCoverage;
+  const resourceProgress = Number.isFinite(Number(resourceCoverage))
+    ? `${Math.max(0, Math.min(1, Number(resourceCoverage))) * 100}%`
+    : '0%';
+
+  const replacement = `
+        <article class="card">
+          <div class="kicker">Cobertura de origem externa</div>
+          <div class="stat-value" style="margin-top:7px">${percent(resourceCoverage, 1)}</div>
+          <div class="progress" style="margin-top:8px">
+            <span style="--progress:${resourceProgress}"></span>
+          </div>
+          <p style="margin:10px 0 4px">
+            <strong>Lineage até recurso externo:</strong> ${percent(resourceCoverage, 1)}
+          </p>
+          <p style="margin:0 0 8px">
+            <strong>Lineage até coluna física:</strong> ${percent(physicalCoverage, 1)}
+          </p>
+          <p class="muted" style="margin-bottom:0">
+            A primeira cobertura verifica se a origem externa é conhecida, mesmo quando a fonte é
+            URL, arquivo ou serviço. A segunda é mais estrita e exige uma tabela/coluna física
+            endereçável. Dados inline e colunas calculadas são classificados separadamente.
+          </p>
+        </article>`;
+
+  return html.replace(pattern, replacement);
 }
 
 function injectBeforeSection(html, sectionId, content) {
