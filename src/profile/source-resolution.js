@@ -259,6 +259,7 @@ function baseColumn(column, level, tableResolution) {
     confidence: column.confidence ?? null,
     sourceless: column.sourceless ?? null,
     system: tableResolution?.system ?? null,
+    resolvedViaTable: tableResolution?.table ?? null,
     tableResolutionLevel: tableResolution?.level ?? 'unresolved',
     tableResolutionScope: tableResolution?.scope ?? 'unknown',
     reason: column.reason ?? null,
