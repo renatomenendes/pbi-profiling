@@ -13,6 +13,7 @@ export function buildProfile(
   engineResult,
   {
     businessContext = null,
+    profilingConfig = null,
   } = {},
 ) {
   const {
@@ -31,7 +32,11 @@ export function buildProfile(
   );
   const importance = buildStructuralImportanceProfile(viewerModel, usage);
   const complexity = buildComplexityProfile(viewerModel);
-  const analytical = buildAnalyticalProfile(viewerModel, usage);
+  const analytical = buildAnalyticalProfile(
+    viewerModel,
+    usage,
+    profilingConfig,
+  );
   const context = buildContextProfile(
     businessContext,
     viewerModel,
