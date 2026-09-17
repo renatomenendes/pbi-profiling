@@ -3,6 +3,7 @@ import {
   renderContextSection,
   renderIntelligenceSection,
 } from './intelligence.js';
+import { renderMaintenanceSection } from './maintenance.js';
 
 const NAVIGATION = [
   ['01', 'Visão geral', 'overview'],
@@ -11,10 +12,11 @@ const NAVIGATION = [
   ['04', 'Métricas', 'metrics'],
   ['05', 'Dados', 'data'],
   ['06', 'Inteligência', 'intelligence'],
-  ['07', 'Lineage', 'lineage'],
-  ['08', 'Uso', 'usage'],
-  ['09', 'Qualidade', 'quality'],
-  ['10', 'Técnico', 'technical'],
+  ['07', 'Manutenção', 'maintenance'],
+  ['08', 'Lineage', 'lineage'],
+  ['09', 'Uso', 'usage'],
+  ['10', 'Qualidade', 'quality'],
+  ['11', 'Técnico', 'technical'],
 ];
 
 export function renderEnhancedReportHtml({
@@ -35,6 +37,11 @@ export function renderEnhancedReportHtml({
     html,
     'lineage',
     renderIntelligenceSection(profile),
+  );
+  html = injectBeforeSection(
+    html,
+    'lineage',
+    renderMaintenanceSection(profile),
   );
   html = replaceNavigation(html);
 
