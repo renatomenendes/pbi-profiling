@@ -3,6 +3,7 @@ import { buildComplexityProfile } from './complexity.js';
 import { buildContextProfile } from './context.js';
 import { buildHealthProfile } from './health.js';
 import { buildStructuralImportanceProfile } from './importance.js';
+import { buildMaintenanceProfile } from './maintenance.js';
 import { buildUsageProfile } from './usage.js';
 
 export const PROFILE_SCHEMA_VERSION = 2;
@@ -41,6 +42,15 @@ export function buildProfile(
     {
       pageMetadata,
       brokenReferences: analysis.graph?.brokenRefs ?? [],
+    },
+  );
+  const maintenance = buildMaintenanceProfile(
+    viewerModel,
+    {
+      importance,
+      complexity,
+      context,
+      health,
     },
   );
 
@@ -91,6 +101,7 @@ export function buildProfile(
       sourceResolutionCoverage: health.sourceResolutionCoverage,
       complexity: complexity.combined,
       contextStatus: context.status,
+      maintenanceAttention: maintenance.summary,
     },
     report: {
       pages,
@@ -111,6 +122,7 @@ export function buildProfile(
     analytical,
     context,
     health,
+    maintenance,
     engineStats: sanitizeEngineStats(viewerModel.stats),
   };
 }
