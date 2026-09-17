@@ -1,24 +1,51 @@
+import { buildSourceResolutionProfile } from './source-resolution.js';
+
 export function buildHealthProfile(
   viewerModel,
   usage,
   {
     pageMetadata = [],
     brokenReferences = [],
+    sourceResolution = null,
   } = {},
 ) {
   const findings = [];
+  const resolution = sourceResolution ?? buildSourceResolutionProfile(viewerModel);
+  const columnResolution = new Map(
+    (resolution.columns ?? []).map((item) => [
+      `${item.table}\u0000${item.column}`,
+      item,
+    ]),
+  );
 
-  const unresolvedColumns = (viewerModel.columns ?? []).filter(
-    (column) =>
-      column.confidence === 'unknown' ||
-      column.sourceless === 'unresolved',
+  const resourceLevelColumns = (viewerModel.columns ?? []).filter((column) =>
+    columnResolution.get(`${column.table}\u0000${column.name}`)?.level === 'resource',
+  );
+
+  if (resourceLevelColumns.length > 0) {
+    findings.push({
+      code: 'resource-level-source-columns',
+      severity: 'info',
+      title: 'Columns traced to a physical resource but not to an addressable physical column',
+      count: resourceLevelColumns.length,
+      evidence: resourceLevelColumns.map((column) => ({
+        table: column.table,
+        column: column.name,
+        system: columnResolution.get(`${column.table}\u0000${column.name}`)?.system ?? null,
+        reason: column.reason ?? null,
+      })),
+    });
+  }
+
+  const unresolvedColumns = (viewerModel.columns ?? []).filter((column) =>
+    columnResolution.get(`${column.table}\u0000${column.name}`)?.level === 'unresolved',
   );
 
   if (unresolvedColumns.length > 0) {
     findings.push({
       code: 'unresolved-source-columns',
       severity: 'warning',
-      title: 'Columns without a resolved physical source',
+      title: 'Columns whose source lineage remains unresolved',
       count: unresolvedColumns.length,
       evidence: unresolvedColumns.map((column) => ({
         table: column.table,
@@ -140,6 +167,8 @@ export function buildHealthProfile(
 
   return {
     sourceResolutionCoverage: coverage,
+    resourceLineageCoverage: resolution.summary.resourceLineageCoverage,
+    sourceResolutionSummary: resolution.summary,
     findings,
     counts: {
       warnings: findings.filter(
