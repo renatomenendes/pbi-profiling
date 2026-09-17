@@ -7,6 +7,64 @@ import { basename, resolve } from 'node:path';
 export const CONTEXT_SCHEMA_VERSION = 1;
 export const DEFAULT_CONTEXT_FILE = 'pbi-profiling.context.json';
 
+const TOP_LEVEL_FIELDS = new Set([
+  '$schema',
+  'schemaVersion',
+  'dashboard',
+  'tables',
+  'measures',
+  'pages',
+  'sources',
+  'notes',
+]);
+
+const DASHBOARD_FIELDS = new Set([
+  'purpose',
+  'audience',
+  'owner',
+  'operationalUse',
+  'businessQuestions',
+  'refresh',
+  'caveats',
+]);
+
+const OWNER_FIELDS = new Set([
+  'team',
+  'contact',
+]);
+
+const REFRESH_FIELDS = new Set([
+  'cadence',
+  'sla',
+  'timezone',
+]);
+
+const ENTITY_FIELDS = new Set([
+  'businessMeaning',
+  'businessDefinition',
+  'purpose',
+  'grain',
+  'key',
+  'owner',
+  'criticality',
+  'audience',
+  'operationalUse',
+  'businessQuestions',
+  'refresh',
+  'sla',
+  'caveats',
+  'notes',
+]);
+
+const ARRAY_FIELDS = new Set([
+  'key',
+  'audience',
+  'operationalUse',
+  'businessQuestions',
+  'caveats',
+  'notes',
+]);
+
 export function loadBusinessContext(targetPath, explicitPath = null) {
   const target = resolve(targetPath);
   const candidate = explicitPath
@@ -46,9 +104,8 @@ export function loadBusinessContext(targetPath, explicitPath = null) {
 }
 
 export function validateAndNormalizeContext(value) {
-  if (!isPlainObject(value)) {
-    throw new Error('Business context must be a JSON object.');
-  }
+  assertPlainObject(value, 'Business context');
+  assertAllowedKeys(value, TOP_LEVEL_FIELDS, 'business context');
 
   if (value.schemaVersion !== CONTEXT_SCHEMA_VERSION) {
     throw new Error(
@@ -56,13 +113,12 @@ export function validateAndNormalizeContext(value) {
     );
   }
 
-  const warnings = [];
-  const dashboard = normalizeDashboard(value.dashboard, warnings);
-  const tables = normalizeEntityMap(value.tables, 'tables', warnings);
-  const measures = normalizeEntityMap(value.measures, 'measures', warnings);
-  const pages = normalizeEntityMap(value.pages, 'pages', warnings);
-  const sources = normalizeEntityMap(value.sources, 'sources', warnings);
-  const notes = normalizeStringArray(value.notes, 'notes', warnings);
+  const dashboard = normalizeDashboard(value.dashboard);
+  const tables = normalizeEntityMap(value.tables, 'tables');
+  const measures = normalizeEntityMap(value.measures, 'measures');
+  const pages = normalizeEntityMap(value.pages, 'pages');
+  const sources = normalizeEntityMap(value.sources, 'sources');
+  const notes = normalizeStringArray(value.notes, 'notes');
 
   return {
     data: {
@@ -74,11 +130,11 @@ export function validateAndNormalizeContext(value) {
       sources,
       notes,
     },
-    warnings,
+    warnings: [],
   };
 }
 
-function normalizeDashboard(value, warnings) {
+function normalizeDashboard(value) {
   if (value == null) {
     return {
       purpose: null,
@@ -91,147 +147,100 @@ function normalizeDashboard(value, warnings) {
     };
   }
 
-  if (!isPlainObject(value)) {
-    throw new Error('dashboard must be a JSON object when provided.');
-  }
-
-  const owner = normalizeOwner(value.owner, warnings);
-  const refresh = normalizeRefresh(value.refresh, warnings);
+  assertPlainObject(value, 'dashboard');
+  assertAllowedKeys(value, DASHBOARD_FIELDS, 'dashboard');
 
   return {
-    purpose: normalizeOptionalString(value.purpose, 'dashboard.purpose', warnings),
-    audience: normalizeStringArray(value.audience, 'dashboard.audience', warnings),
-    owner,
+    purpose: normalizeOptionalString(value.purpose, 'dashboard.purpose'),
+    audience: normalizeStringArray(value.audience, 'dashboard.audience'),
+    owner: normalizeOwner(value.owner),
     operationalUse: normalizeStringArray(
       value.operationalUse,
       'dashboard.operationalUse',
-      warnings,
     ),
     businessQuestions: normalizeStringArray(
       value.businessQuestions,
       'dashboard.businessQuestions',
-      warnings,
     ),
-    refresh,
-    caveats: normalizeStringArray(value.caveats, 'dashboard.caveats', warnings),
+    refresh: normalizeRefresh(value.refresh),
+    caveats: normalizeStringArray(value.caveats, 'dashboard.caveats'),
   };
 }
 
-function normalizeOwner(value, warnings) {
+function normalizeOwner(value) {
   if (value == null) {
     return null;
   }
-  if (!isPlainObject(value)) {
-    throw new Error('dashboard.owner must be an object when provided.');
-  }
+
+  assertPlainObject(value, 'dashboard.owner');
+  assertAllowedKeys(value, OWNER_FIELDS, 'dashboard.owner');
 
   return {
-    team: normalizeOptionalString(value.team, 'dashboard.owner.team', warnings),
+    team: normalizeOptionalString(value.team, 'dashboard.owner.team'),
     contact: normalizeOptionalString(
       value.contact,
       'dashboard.owner.contact',
-      warnings,
     ),
   };
 }
 
-function normalizeRefresh(value, warnings) {
+function normalizeRefresh(value) {
   if (value == null) {
     return null;
   }
-  if (!isPlainObject(value)) {
-    throw new Error('dashboard.refresh must be an object when provided.');
-  }
+
+  assertPlainObject(value, 'dashboard.refresh');
+  assertAllowedKeys(value, REFRESH_FIELDS, 'dashboard.refresh');
 
   return {
     cadence: normalizeOptionalString(
       value.cadence,
       'dashboard.refresh.cadence',
-      warnings,
     ),
-    sla: normalizeOptionalString(value.sla, 'dashboard.refresh.sla', warnings),
+    sla: normalizeOptionalString(value.sla, 'dashboard.refresh.sla'),
     timezone: normalizeOptionalString(
       value.timezone,
       'dashboard.refresh.timezone',
-      warnings,
     ),
   };
 }
 
-function normalizeEntityMap(value, path, warnings) {
+function normalizeEntityMap(value, path) {
   if (value == null) {
     return {};
   }
-  if (!isPlainObject(value)) {
-    throw new Error(`${path} must be an object keyed by PBIP object name.`);
-  }
+
+  assertPlainObject(value, path);
 
   const normalized = {};
   for (const [name, metadata] of Object.entries(value)) {
-    if (!isPlainObject(metadata)) {
-      throw new Error(`${path}.${name} must be an object.`);
-    }
-
-    normalized[name] = normalizeFreeformMetadata(metadata, `${path}.${name}`, warnings);
+    assertPlainObject(metadata, `${path}.${name}`);
+    normalized[name] = normalizeEntityMetadata(metadata, `${path}.${name}`);
   }
   return normalized;
 }
 
-function normalizeFreeformMetadata(metadata, path, warnings) {
-  const allowed = new Set([
-    'businessMeaning',
-    'businessDefinition',
-    'purpose',
-    'grain',
-    'key',
-    'owner',
-    'criticality',
-    'audience',
-    'operationalUse',
-    'businessQuestions',
-    'refresh',
-    'sla',
-    'caveats',
-    'notes',
-  ]);
+function normalizeEntityMetadata(metadata, path) {
+  assertAllowedKeys(metadata, ENTITY_FIELDS, path);
 
   const result = {};
   for (const [field, value] of Object.entries(metadata)) {
-    if (!allowed.has(field)) {
-      warnings.push(`${path}.${field} is not a recognized context field and was ignored.`);
-      continue;
-    }
-
-    if (['key', 'audience', 'operationalUse', 'businessQuestions', 'caveats', 'notes'].includes(field)) {
-      result[field] = normalizeStringArray(value, `${path}.${field}`, warnings);
+    if (ARRAY_FIELDS.has(field)) {
+      result[field] = normalizeStringArray(value, `${path}.${field}`);
       continue;
     }
 
     if (field === 'owner') {
-      if (typeof value === 'string') {
-        result[field] = value.trim() || null;
-      } else if (isPlainObject(value)) {
-        result[field] = Object.fromEntries(
-          Object.entries(value)
-            .filter(([, item]) => typeof item === 'string' && item.trim())
-            .map(([name, item]) => [name, item.trim()]),
-        );
-      } else if (value != null) {
-        warnings.push(`${path}.${field} was ignored because it is not a string/object.`);
-      }
+      result[field] = normalizeFlexibleStringObject(value, `${path}.${field}`);
       continue;
     }
 
-    if (field === 'refresh' && isPlainObject(value)) {
-      result[field] = Object.fromEntries(
-        Object.entries(value)
-          .filter(([, item]) => typeof item === 'string' && item.trim())
-          .map(([name, item]) => [name, item.trim()]),
-      );
+    if (field === 'refresh') {
+      result[field] = normalizeStringObject(value, `${path}.${field}`);
       continue;
     }
 
-    const normalized = normalizeOptionalString(value, `${path}.${field}`, warnings);
+    const normalized = normalizeOptionalString(value, `${path}.${field}`);
     if (normalized !== null) {
       result[field] = normalized;
     }
@@ -240,40 +249,76 @@ function normalizeFreeformMetadata(metadata, path, warnings) {
   return result;
 }
 
-function normalizeOptionalString(value, path, warnings) {
+function normalizeFlexibleStringObject(value, path) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() || null;
+  }
+
+  return normalizeStringObject(value, path);
+}
+
+function normalizeStringObject(value, path) {
+  assertPlainObject(value, path);
+
+  const normalized = {};
+  for (const [name, item] of Object.entries(value)) {
+    if (typeof item !== 'string') {
+      throw new Error(`${path}.${name} must be a string.`);
+    }
+    const trimmed = item.trim();
+    if (trimmed) {
+      normalized[name] = trimmed;
+    }
+  }
+  return normalized;
+}
+
+function normalizeOptionalString(value, path) {
   if (value == null) {
     return null;
   }
   if (typeof value !== 'string') {
-    warnings.push(`${path} was ignored because it is not a string.`);
-    return null;
+    throw new Error(`${path} must be a string.`);
   }
   return value.trim() || null;
 }
 
-function normalizeStringArray(value, path, warnings) {
+function normalizeStringArray(value, path) {
   if (value == null) {
     return [];
   }
 
   if (!Array.isArray(value)) {
-    warnings.push(`${path} was ignored because it is not an array.`);
-    return [];
+    throw new Error(`${path} must be an array of strings.`);
   }
 
-  const strings = [];
-  value.forEach((item, index) => {
+  const strings = value.map((item, index) => {
     if (typeof item !== 'string') {
-      warnings.push(`${path}[${index}] was ignored because it is not a string.`);
-      return;
+      throw new Error(`${path}[${index}] must be a string.`);
     }
-    const normalized = item.trim();
-    if (normalized) {
-      strings.push(normalized);
-    }
-  });
+    return item.trim();
+  }).filter(Boolean);
 
   return [...new Set(strings)];
+}
+
+function assertPlainObject(value, path) {
+  if (!isPlainObject(value)) {
+    throw new Error(`${path} must be a JSON object.`);
+  }
+}
+
+function assertAllowedKeys(value, allowed, path) {
+  const unknown = Object.keys(value).filter((key) => !allowed.has(key));
+  if (unknown.length > 0) {
+    throw new Error(
+      `${path} contains unsupported field(s): ${unknown.sort().join(', ')}.`,
+    );
+  }
 }
 
 function emptyContext() {
