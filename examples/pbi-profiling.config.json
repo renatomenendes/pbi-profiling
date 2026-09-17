@@ -1,0 +1,19 @@
+{
+  "$schema": "../schemas/pbi-profiling.config.schema.json",
+  "schemaVersion": 1,
+  "analysis": {
+    "semanticHints": {
+      "mode": "extend",
+      "terms": {
+        "state": ["mode"],
+        "entity": ["account"],
+        "freshness": ["arrival"]
+      },
+      "columns": {
+        "FactEvents[ObservedAt]": ["temporal"],
+        "FactEvents[OperatingMode]": ["state"],
+        "FactEvents[AccountCode]": ["entity"]
+      }
+    }
+  }
+}

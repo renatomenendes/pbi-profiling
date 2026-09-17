@@ -1,8 +1,40 @@
-const TEMPORAL_NAME_RE = /(^|\s)(date|data|datetime|timestamp|time|hora|hour|day|dia|month|mes|m[eê]s|year|ano|created|updated|atualiza[cç][aã]o|reference|refer[eê]ncia)(\s|$)/i;
-const STATE_NAME_RE = /(^|\s)(status|state|estado|situa[cç][aã]o|condition|condi[cç][aã]o|online|offline|sla|flag|faixa|severity|severidade)(\s|$)/i;
-const DURATION_NAME_RE = /(^|\s)(duration|dura[cç][aã]o|elapsed|tempo|hours?|horas?|minutes?|minutos?|days?|dias?|aging|age|latency|lat[eê]ncia)(\s|$)/i;
-const ENTITY_NAME_RE = /(^|\s)(site|unidade|unit|device|dispositivo|camera|c[aâ]mera|sensor|asset|ativo|fornecedor|supplier|municipio|munic[ií]pio|region|regi[aã]o|location|local|id|name|nome)(\s|$)/i;
-const FRESHNESS_NAME_RE = /(^|\s)(updated|modified|refresh|atualiza[cç][aã]o|ingest|load|carga|timestamp|created)(\s|$)/i;
+const SEMANTIC_CATEGORIES = [
+  'temporal',
+  'state',
+  'duration',
+  'entity',
+  'freshness',
+];
+
+const DEFAULT_SEMANTIC_TERMS = Object.freeze({
+  temporal: [
+    'date', 'data', 'datetime', 'timestamp', 'time', 'hora',
+    'day', 'dia', 'month', 'mes', 'mês', 'quarter', 'trimestre',
+    'year', 'ano', 'created', 'criado', 'updated', 'atualizado',
+    'modified', 'modificado', 'reference', 'referencia', 'referência',
+    'event', 'evento',
+  ],
+  state: [
+    'status', 'state', 'estado', 'condition', 'condicao', 'condição',
+    'stage', 'estagio', 'estágio', 'phase', 'fase',
+  ],
+  duration: [
+    'duration', 'duracao', 'duração', 'elapsed', 'tempo',
+    'hour', 'hours', 'hora', 'horas', 'minute', 'minutes',
+    'minuto', 'minutos', 'day', 'days', 'dia', 'dias',
+    'age', 'aging', 'latency', 'latencia', 'latência',
+  ],
+  entity: [
+    'id', 'key', 'chave', 'code', 'codigo', 'código',
+    'name', 'nome', 'category', 'categoria', 'type', 'tipo',
+    'group', 'grupo',
+  ],
+  freshness: [
+    'updated', 'atualizado', 'modified', 'modificado',
+    'refresh', 'refreshed', 'ingest', 'ingested', 'ingestion',
+    'load', 'loaded', 'carga', 'arrival', 'chegada',
+  ],
+});
 
 const NUMERIC_TYPES = new Set([
   'int64',
@@ -22,6 +54,8 @@ const TEMPORAL_TYPES = new Set([
   'datetime',
 ]);
 
+const TEXT_TYPES = new Set(['string', 'text']);
+
 const SERIES_VISUAL_TYPES = new Set([
   'lineChart',
   'areaChart',
@@ -31,19 +65,35 @@ const SERIES_VISUAL_TYPES = new Set([
   'lineClusteredColumnComboChart',
 ]);
 
-export function buildAnalyticalProfile(viewerModel, usage) {
-  const signals = detectSignals(viewerModel, usage);
+const GROUPING_ROLE_RE = /(^|\s)(category|axis|legend|group|rows?|slicer|series|details?)(\s|$)/i;
+
+export function buildAnalyticalProfile(
+  viewerModel,
+  usage,
+  profilingConfig = null,
+) {
+  const semantics = buildSemanticConfiguration(profilingConfig);
+  const signals = detectSignals(viewerModel, usage, semantics);
   const capabilities = buildCapabilities(signals);
   const opportunities = buildOpportunities(signals, capabilities);
 
   return {
     methodology: {
       scope:
-        'Analytical relevance is inferred only from observable schema, DAX, visual bindings and naming/type signals. It does not assert business value or data quality.',
+        'Analytical relevance is inferred only from observable schema, data types, DAX, relationships, visual bindings and explicitly bounded semantic hints. It does not assert business value or data quality.',
       confidence:
-        'Confidence reflects convergence of independent structural signals, not statistical validation on row-level data.',
+        'Confidence reflects convergence of independent structural evidence, not statistical validation on row-level data.',
       identifierNormalization:
-        'Column names are tokenized across CamelCase, acronym boundaries, snake_case, kebab-case, punctuation and whitespace before semantic name matching.',
+        'Column names are tokenized across CamelCase, acronym boundaries, snake_case, kebab-case, punctuation and whitespace before exact token/phrase matching.',
+      semanticPolicy:
+        'The built-in vocabulary contains only generic analytical terms. Domain nouns are not embedded in the engine; optional project configuration may extend or replace semantic terms and add explicit column hints.',
+      semanticConfiguration: {
+        status: semantics.status,
+        source: semantics.source,
+        mode: semantics.mode,
+        customTermCount: semantics.customTermCount,
+        explicitColumnHints: semantics.explicitColumnHintCount,
+      },
     },
     signals,
     capabilities,
@@ -51,34 +101,59 @@ export function buildAnalyticalProfile(viewerModel, usage) {
   };
 }
 
-function detectSignals(viewerModel, usage) {
+function detectSignals(viewerModel, usage, semantics) {
   const columns = viewerModel.columns ?? [];
   const visuals = viewerModel.visuals ?? [];
   const measures = viewerModel.measures ?? [];
-  const columnUsage = new Map(
+  const usageByColumn = new Map(
     (usage.columns ?? []).map((item) => [key(item.table, item.name), item]),
   );
+  const relationshipColumns = collectRelationshipColumns(
+    viewerModel.relationships ?? [],
+  );
 
-  const temporalColumns = columns
-    .filter((column) => isTemporalColumn(column))
-    .map((column) => signalColumn(column, columnUsage, 'temporal'));
-  const stateColumns = columns
-    .filter((column) => nameMatches(column.name, STATE_NAME_RE))
-    .map((column) => signalColumn(column, columnUsage, 'state'));
-  const durationColumns = columns
-    .filter((column) => nameMatches(column.name, DURATION_NAME_RE))
-    .map((column) => signalColumn(column, columnUsage, 'duration'));
-  const entityColumns = columns
-    .filter((column) => isEntityColumn(column, columnUsage))
-    .map((column) => signalColumn(column, columnUsage, 'entity'));
-  const freshnessColumns = columns
-    .filter((column) =>
-      isTemporalColumn(column) && nameMatches(column.name, FRESHNESS_NAME_RE),
-    )
-    .map((column) => signalColumn(column, columnUsage, 'freshness'));
-  const numericColumns = columns
-    .filter((column) => NUMERIC_TYPES.has(String(column.dataType ?? '')))
-    .map((column) => signalColumn(column, columnUsage, 'numeric'));
+  const temporalColumns = collectColumnSignals(
+    columns,
+    'temporal',
+    usageByColumn,
+    relationshipColumns,
+    semantics,
+  );
+  const stateColumns = collectColumnSignals(
+    columns,
+    'state',
+    usageByColumn,
+    relationshipColumns,
+    semantics,
+  );
+  const durationColumns = collectColumnSignals(
+    columns,
+    'duration',
+    usageByColumn,
+    relationshipColumns,
+    semantics,
+  );
+  const entityColumns = collectColumnSignals(
+    columns,
+    'entity',
+    usageByColumn,
+    relationshipColumns,
+    semantics,
+  );
+  const freshnessColumns = collectColumnSignals(
+    columns,
+    'freshness',
+    usageByColumn,
+    relationshipColumns,
+    semantics,
+  );
+  const numericColumns = collectColumnSignals(
+    columns,
+    'numeric',
+    usageByColumn,
+    relationshipColumns,
+    semantics,
+  );
 
   const temporalMeasures = measures
     .filter((measure) => usesTimeIntelligence(measure.expression ?? ''))
@@ -86,6 +161,8 @@ function detectSignals(viewerModel, usage) {
       table: measure.table,
       name: measure.name,
       expression: measure.expression ?? null,
+      confidence: 'high',
+      evidence: ['dax-time-intelligence'],
     }));
 
   const seriesVisuals = visuals
@@ -96,11 +173,8 @@ function detectSignals(viewerModel, usage) {
       type: visual.type,
       title: visual.title ?? null,
       fields: visual.fields ?? [],
+      evidence: ['visual-type'],
     }));
-
-  const stateTransitionReady = intersectTables(temporalColumns, stateColumns);
-  const entityTemporalReady = intersectTables(temporalColumns, entityColumns);
-  const numericTemporalReady = intersectTables(temporalColumns, numericColumns);
 
   return {
     temporalColumns,
@@ -112,9 +186,9 @@ function detectSignals(viewerModel, usage) {
     numericColumns,
     seriesVisuals,
     tableIntersections: {
-      temporalAndState: stateTransitionReady,
-      temporalAndEntity: entityTemporalReady,
-      temporalAndNumeric: numericTemporalReady,
+      temporalAndState: intersectTables(temporalColumns, stateColumns),
+      temporalAndEntity: intersectTables(temporalColumns, entityColumns),
+      temporalAndNumeric: intersectTables(temporalColumns, numericColumns),
     },
     counts: {
       temporalColumns: temporalColumns.length,
@@ -127,6 +201,187 @@ function detectSignals(viewerModel, usage) {
       seriesVisuals: seriesVisuals.length,
     },
   };
+}
+
+function collectColumnSignals(
+  columns,
+  category,
+  usageByColumn,
+  relationshipColumns,
+  semantics,
+) {
+  return columns
+    .map((column) => classifyColumnSignal(
+      column,
+      category,
+      usageByColumn,
+      relationshipColumns,
+      semantics,
+    ))
+    .filter(Boolean);
+}
+
+function classifyColumnSignal(
+  column,
+  category,
+  usageByColumn,
+  relationshipColumns,
+  semantics,
+) {
+  const observed = usageByColumn.get(key(column.table, column.name));
+  const evidence = [];
+  const type = String(column.dataType ?? '');
+  const reference = `${column.table}[${column.name}]`;
+
+  if (category === 'numeric' && NUMERIC_TYPES.has(type)) {
+    evidence.push('data-type:numeric');
+  }
+
+  if (category === 'temporal' && TEMPORAL_TYPES.has(type)) {
+    evidence.push('data-type:temporal');
+  }
+
+  if (
+    category === 'entity' &&
+    relationshipColumns.has(reference)
+  ) {
+    evidence.push('relationship-key');
+  }
+
+  if (
+    category === 'entity' &&
+    TEXT_TYPES.has(type.toLowerCase()) &&
+    hasGroupingRole(observed?.roles ?? [])
+  ) {
+    evidence.push('visual-grouping-role');
+  }
+
+  if (category !== 'numeric') {
+    evidence.push(...semanticNameEvidence(column.name, category, semantics));
+
+    if (semantics.columnHints.get(reference)?.has(category)) {
+      evidence.push('explicit-column-hint');
+    }
+  }
+
+  const normalizedEvidence = unique(evidence);
+  if (normalizedEvidence.length === 0) {
+    return null;
+  }
+
+  return {
+    category,
+    table: column.table,
+    name: column.name,
+    dataType: column.dataType ?? null,
+    visualReferences: observed?.visualReferences ?? 0,
+    pageReferences: observed?.pageReferences ?? 0,
+    roles: observed?.roles ?? [],
+    vias: observed?.vias ?? [],
+    confidence: evidenceConfidence(normalizedEvidence),
+    evidence: normalizedEvidence,
+  };
+}
+
+function semanticNameEvidence(name, category, semantics) {
+  const normalized = normalizeIdentifier(name);
+  const evidence = [];
+
+  if (
+    semantics.defaultTerms[category]?.some((term) =>
+      phraseMatches(normalized, term),
+    )
+  ) {
+    evidence.push('default-lexicon');
+  }
+
+  if (
+    semantics.customTerms[category]?.some((term) =>
+      phraseMatches(normalized, term),
+    )
+  ) {
+    evidence.push('custom-semantic-term');
+  }
+
+  return evidence;
+}
+
+function phraseMatches(normalizedIdentifier, normalizedTerm) {
+  if (!normalizedIdentifier || !normalizedTerm) {
+    return false;
+  }
+
+  return (
+    normalizedIdentifier === normalizedTerm ||
+    ` ${normalizedIdentifier} `.includes(` ${normalizedTerm} `)
+  );
+}
+
+function hasGroupingRole(roles) {
+  return roles.some((role) =>
+    GROUPING_ROLE_RE.test(normalizeIdentifier(role)),
+  );
+}
+
+function collectRelationshipColumns(relationships) {
+  const result = new Set();
+
+  for (const relationship of relationships) {
+    if (relationship.fromTable && relationship.fromColumn) {
+      result.add(`${relationship.fromTable}[${relationship.fromColumn}]`);
+    }
+    if (relationship.toTable && relationship.toColumn) {
+      result.add(`${relationship.toTable}[${relationship.toColumn}]`);
+    }
+  }
+
+  return result;
+}
+
+function buildSemanticConfiguration(profilingConfig) {
+  const hints = profilingConfig?.data?.analysis?.semanticHints ?? {};
+  const mode = hints.mode === 'replace' ? 'replace' : 'extend';
+  const customTerms = normalizeTermMap(hints.terms ?? {});
+  const defaultTerms = mode === 'replace'
+    ? emptyTermMap()
+    : normalizeTermMap(DEFAULT_SEMANTIC_TERMS);
+  const columnHints = new Map(
+    Object.entries(hints.columns ?? {}).map(([reference, categories]) => [
+      reference,
+      new Set(categories),
+    ]),
+  );
+
+  return {
+    status: profilingConfig?.status ?? 'not-provided',
+    source: profilingConfig?.source ?? null,
+    mode,
+    defaultTerms,
+    customTerms,
+    columnHints,
+    customTermCount: Object.values(customTerms)
+      .reduce((total, terms) => total + terms.length, 0),
+    explicitColumnHintCount: columnHints.size,
+  };
+}
+
+function normalizeTermMap(value) {
+  return Object.fromEntries(
+    SEMANTIC_CATEGORIES.map((category) => [
+      category,
+      unique(
+        (value[category] ?? [])
+          .map(normalizeIdentifier)
+          .filter(Boolean),
+      ),
+    ]),
+  );
+}
+
+function emptyTermMap() {
+  return Object.fromEntries(
+    SEMANTIC_CATEGORIES.map((category) => [category, []]),
+  );
 }
 
 function buildCapabilities(signals) {
@@ -148,7 +403,7 @@ function buildCapabilities(signals) {
         signals.stateColumns.length,
       [
         ...refs(signals.stateColumns),
-        ...signals.tableIntersections.temporalAndState.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
       ],
       'Transition analysis is strongest when repeated observations exist for the same entity.',
     ),
@@ -159,7 +414,7 @@ function buildCapabilities(signals) {
         signals.tableIntersections.temporalAndState.length,
       [
         ...refs(signals.durationColumns),
-        ...signals.tableIntersections.temporalAndState.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
       ],
       'Duration can be explicit or derivable only after row-level grain and ordering are validated.',
     ),
@@ -170,7 +425,7 @@ function buildCapabilities(signals) {
         signals.tableIntersections.temporalAndNumeric.length,
       [
         ...refs(signals.entityColumns),
-        ...signals.tableIntersections.temporalAndNumeric.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndNumeric),
       ],
       'Peer groups must be semantically comparable before deviation scores are meaningful.',
     ),
@@ -198,7 +453,9 @@ function buildCapabilities(signals) {
 }
 
 function buildOpportunities(signals, capabilities) {
-  const capabilityById = new Map(capabilities.map((item) => [item.id, item]));
+  const capabilityById = new Map(
+    capabilities.map((item) => [item.id, item]),
+  );
 
   return [
     opportunity(
@@ -206,16 +463,18 @@ function buildOpportunities(signals, capabilities) {
       'Anomalias pontuais em métricas',
       combineStrength(
         capabilityById.get('temporal-analysis'),
-        signals.numericColumns.length + signals.temporalMeasures.length,
+        signals.tableIntersections.temporalAndNumeric.length * 2 +
+          signals.temporalMeasures.length,
       ),
       [
         ...refs(signals.temporalColumns),
         ...refs(signals.numericColumns),
         ...measureRefs(signals.temporalMeasures),
+        ...tableRefs(signals.tableIntersections.temporalAndNumeric),
       ],
       [
         'Confirm observation grain and cadence.',
-        'Identify the metric whose deviations have operational meaning.',
+        'Identify the metric whose deviations have business meaning.',
         'Validate enough historical depth for baseline estimation.',
       ],
     ),
@@ -229,12 +488,12 @@ function buildOpportunities(signals, capabilities) {
       [
         ...refs(signals.entityColumns),
         ...refs(signals.temporalColumns),
-        ...signals.tableIntersections.temporalAndEntity.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndEntity),
       ],
       [
         'Define comparable peer groups.',
         'Validate contextual variables and cardinality.',
-        'Separate expected seasonal variation from abnormal behavior.',
+        'Separate expected periodic variation from abnormal behavior.',
       ],
     ),
     opportunity(
@@ -247,7 +506,7 @@ function buildOpportunities(signals, capabilities) {
       [
         ...refs(signals.durationColumns),
         ...visualRefs(signals.seriesVisuals),
-        ...signals.tableIntersections.temporalAndState.map((table) => `table:${table}`),
+        ...tableRefs(signals.tableIntersections.temporalAndState),
       ],
       [
         'Validate ordered repeated observations per entity.',
@@ -298,6 +557,7 @@ function buildOpportunities(signals, capabilities) {
 function capability(id, title, evidenceStrength, evidence, caveat) {
   const strength = evidenceToStrength(evidenceStrength);
   const normalizedEvidence = unique(evidence);
+
   return {
     id,
     title,
@@ -312,6 +572,7 @@ function capability(id, title, evidenceStrength, evidence, caveat) {
 function opportunity(id, title, strength, evidence, prerequisites) {
   const normalized = clamp(strength);
   const normalizedEvidence = unique(evidence);
+
   return {
     id,
     title,
@@ -325,53 +586,19 @@ function opportunity(id, title, strength, evidence, prerequisites) {
   };
 }
 
-function signalColumn(column, usageByKey, category) {
-  const observed = usageByKey.get(key(column.table, column.name));
-  return {
-    category,
-    table: column.table,
-    name: column.name,
-    dataType: column.dataType ?? null,
-    visualReferences: observed?.visualReferences ?? 0,
-    pageReferences: observed?.pageReferences ?? 0,
-    roles: observed?.roles ?? [],
-    vias: observed?.vias ?? [],
-    confidence: columnNameConfidence(column, category),
-  };
-}
-
-function isTemporalColumn(column) {
-  return TEMPORAL_TYPES.has(String(column.dataType ?? '')) ||
-    nameMatches(column.name, TEMPORAL_NAME_RE);
-}
-
-function isEntityColumn(column, usageByKey) {
-  if (nameMatches(column.name, ENTITY_NAME_RE)) {
-    return true;
-  }
-
-  const observed = usageByKey.get(key(column.table, column.name));
-  const roleText = (observed?.roles ?? []).join(' ');
-  const type = String(column.dataType ?? '').toLowerCase();
-  return (
-    (type === 'string' || type === 'text') &&
-    /(category|axis|legend|group|rows|slicer)/i.test(roleText)
-  );
-}
-
-function columnNameConfidence(column, category) {
-  const type = String(column.dataType ?? '');
-  if (category === 'temporal' && TEMPORAL_TYPES.has(type)) {
+function evidenceConfidence(evidence) {
+  if (
+    evidence.some((item) => [
+      'explicit-column-hint',
+      'data-type:temporal',
+      'data-type:numeric',
+      'relationship-key',
+    ].includes(item))
+  ) {
     return 'high';
   }
-  if (category === 'numeric' && NUMERIC_TYPES.has(type)) {
-    return 'high';
-  }
-  return 'medium';
-}
 
-function nameMatches(value, expression) {
-  return expression.test(normalizeIdentifier(value));
+  return evidence.length > 0 ? 'medium' : 'none';
 }
 
 function normalizeIdentifier(value) {
@@ -381,7 +608,8 @@ function normalizeIdentifier(value) {
     .replace(/[_\-./\\]+/g, ' ')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 function usesTimeIntelligence(expression) {
@@ -393,7 +621,9 @@ function usesTimeIntelligence(expression) {
 function intersectTables(left, right) {
   const leftTables = new Set(left.map((item) => item.table));
   return unique(
-    right.map((item) => item.table).filter((table) => leftTables.has(table)),
+    right
+      .map((item) => item.table)
+      .filter((table) => leftTables.has(table)),
   );
 }
 
@@ -409,54 +639,40 @@ function visualRefs(items) {
   return items.map((item) => `visual:${item.page}/${item.visual}`);
 }
 
+function tableRefs(items) {
+  return items.map((table) => `table:${table}`);
+}
+
 function combineStrength(capabilityItem, additionalEvidence) {
   const base = capabilityItem?.strength ?? 0;
-  return clamp(base * 0.7 + evidenceToStrength(additionalEvidence) * 0.3);
+  return clamp(
+    base * 0.7 + evidenceToStrength(additionalEvidence) * 0.3,
+  );
 }
 
 function evidenceToStrength(count) {
-  if (count <= 0) {
-    return 0;
-  }
-  if (count === 1) {
-    return 0.35;
-  }
-  if (count <= 3) {
-    return 0.60;
-  }
-  if (count <= 6) {
-    return 0.80;
-  }
+  if (count <= 0) return 0;
+  if (count === 1) return 0.35;
+  if (count <= 3) return 0.60;
+  if (count <= 6) return 0.80;
   return 1;
 }
 
 function strengthStatus(strength) {
-  if (strength >= 0.75) {
-    return 'strong-structural-support';
-  }
-  if (strength >= 0.40) {
-    return 'partial-structural-support';
-  }
+  if (strength >= 0.75) return 'strong-structural-support';
+  if (strength >= 0.40) return 'partial-structural-support';
   return 'not-observed';
 }
 
 function opportunityStatus(strength) {
-  if (strength >= 0.75) {
-    return 'supported-candidate';
-  }
-  if (strength >= 0.40) {
-    return 'candidate-needs-validation';
-  }
+  if (strength >= 0.75) return 'supported-candidate';
+  if (strength >= 0.40) return 'candidate-needs-validation';
   return 'insufficient-structural-evidence';
 }
 
 function confidenceBand(evidenceCount) {
-  if (evidenceCount >= 5) {
-    return 'high';
-  }
-  if (evidenceCount >= 2) {
-    return 'medium';
-  }
+  if (evidenceCount >= 5) return 'high';
+  if (evidenceCount >= 2) return 'medium';
   return evidenceCount === 1 ? 'low' : 'none';
 }
 

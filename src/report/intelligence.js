@@ -115,6 +115,10 @@ export function renderIntelligenceSection(profile) {
         'Centralidade técnica, complexidade e potencial analítico derivados de evidência estrutural. Estes indicadores não substituem contexto de negócio nem validação estatística.',
       )}
 
+      ${semanticConfigurationCallout(
+        analytical?.methodology?.semanticConfiguration,
+      )}
+
       <div class="grid stats-grid">
         ${scoreCard('Complexidade combinada', complexity?.combined)}
         ${scoreCard('Modelo semântico', complexity?.semanticModel)}
@@ -193,9 +197,49 @@ export function renderIntelligenceSection(profile) {
             <p class="muted">${text(complexity?.methodology?.interpretation)}</p>
             <pre class="code">${text(JSON.stringify(complexity?.methodology, null, 2), '')}</pre>
           </div>
+          <div>
+            <strong>Semântica analítica</strong>
+            <p class="muted">${text(analytical?.methodology?.semanticPolicy)}</p>
+            <pre class="code">${text(JSON.stringify(analytical?.methodology?.semanticConfiguration, null, 2), '')}</pre>
+          </div>
         </div>
       </details>
     </section>
+  `;
+}
+
+function semanticConfigurationCallout(configuration) {
+  const provided = configuration?.status === 'provided';
+
+  if (!provided) {
+    return `
+      <div class="callout info" style="margin-bottom:14px">
+        <span class="callout-mark" aria-hidden="true"></span>
+        <div>
+          <h4>Semântica genérica</h4>
+          <p>
+            A análise usa somente tipos, DAX, relacionamentos, papéis dos visuais e um vocabulário
+            analítico genérico. Nenhum vocabulário de domínio foi fornecido para este projeto.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="callout info" style="margin-bottom:14px">
+      <span class="callout-mark" aria-hidden="true"></span>
+      <div>
+        <h4>Semântica configurada</h4>
+        <p>
+          Configuração local: <span class="mono">${text(configuration.source)}</span> ·
+          modo ${text(configuration.mode)} ·
+          ${number(configuration.customTermCount)} termo(s) adicionais ·
+          ${number(configuration.explicitColumnHints)} hint(s) explícito(s) de coluna.
+          Os hints complementam a evidência estrutural e permanecem identificáveis no perfil.
+        </p>
+      </div>
+    </div>
   `;
 }
 

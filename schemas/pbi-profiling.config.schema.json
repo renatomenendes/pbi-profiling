@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/renatomenendes/pbi-profiling/schemas/pbi-profiling.config.schema.json",
+  "title": "pbi-profiling configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "semanticHints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["extend", "replace"]
+            },
+            "terms": {
+              "$ref": "#/$defs/semanticTerms"
+            },
+            "columns": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[^\\[\\]]+\\[[^\\[\\]]+\\]$"
+              },
+              "additionalProperties": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "temporal",
+                    "state",
+                    "duration",
+                    "entity",
+                    "freshness"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semanticTerms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temporal": { "$ref": "#/$defs/stringArray" },
+        "state": { "$ref": "#/$defs/stringArray" },
+        "duration": { "$ref": "#/$defs/stringArray" },
+        "entity": { "$ref": "#/$defs/stringArray" },
+        "freshness": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
