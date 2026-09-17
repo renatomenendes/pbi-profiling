@@ -9,6 +9,7 @@
     "overview",
     "report",
     "semanticModel",
+    "sourceResolution",
     "usage",
     "importance",
     "complexity",
@@ -57,6 +58,17 @@
       },
       "additionalProperties": true
     },
+    "sourceResolution": {
+      "type": "object",
+      "required": ["methodology", "summary", "tables", "columns"],
+      "properties": {
+        "methodology": { "$ref": "#/$defs/object" },
+        "summary": { "$ref": "#/$defs/object" },
+        "tables": { "$ref": "#/$defs/array" },
+        "columns": { "$ref": "#/$defs/array" }
+      },
+      "additionalProperties": true
+    },
     "usage": { "$ref": "#/$defs/object" },
     "importance": {
       "type": "object",
@@ -94,7 +106,7 @@
     },
     "health": {
       "type": "object",
-      "required": ["sourceResolutionCoverage", "findings", "counts"],
+      "required": ["sourceResolutionCoverage", "resourceLineageCoverage", "findings", "counts"],
       "additionalProperties": true
     },
     "maintenance": {
