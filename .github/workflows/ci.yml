@@ -27,11 +27,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+
+      - name: Verify pinned upstream
+        run: test "$(git -C vendor/pbi-lineage-lenz rev-parse HEAD)" = "7e2c61cac2f5e0ca6e7135df17a6918c89c42aec"
 
       - name: Install dependencies
         run: npm install --no-fund --no-audit

@@ -2,18 +2,19 @@
 
 `pbi-profiling` depends on and selectively adapts ideas from open-source Power BI tooling.
 
-## Runtime dependencies
+## Pinned runtime source dependency
 
 ### PBI Lineage Lenz
 
 - Repository: https://github.com/JonathanJihwanKim/pbi-lineage-lenz
-- Evaluated commit: `7e2c61cac2f5e0ca6e7135df17a6918c89c42aec`
-- Packages: `@pbi-lineage-lenz/core`, `@pbi-lineage-lenz/viewer`
+- Pinned commit: `7e2c61cac2f5e0ca6e7135df17a6918c89c42aec`
+- Packages used: `@pbi-lineage-lenz/core`, `@pbi-lineage-lenz/viewer`
 - License: MIT
 - Copyright: Jihwan Kim
-- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, graph/lineage, serializable viewer model.
+- Integration: Git submodule at `vendor/pbi-lineage-lenz`; package dependencies resolve from the pinned local source rather than an unpinned registry release.
+- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, graph/lineage, and serializable viewer model.
 
-The original MIT license remains applicable to those packages.
+The original MIT license remains applicable to the upstream source. The submodule preserves the upstream repository history and license verbatim.
 
 ## Approved sources for selective adaptation
 
@@ -42,6 +43,10 @@ Any adapted source file will carry a local provenance header identifying the ori
 - Repository: https://github.com/maxanatsko/pbir.tools
 - License: Custom Non-Commercial License
 - Status: benchmark/reference only. No code, template, or implementation may be copied or adapted because derivative works require explicit author consent and commercial use is restricted.
+
+## Test fixture provenance
+
+The integration test contains a minimal textual fixture adapted from `pbi-lineage-lenz/samples/sample-pbip` at the pinned commit above. The fixture is covered by the upstream MIT license and carries an inline provenance header.
 
 ## Project-specific code
 

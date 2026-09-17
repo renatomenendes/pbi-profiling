@@ -19,8 +19,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@pbi-lineage-lenz/core": "2.0.0",
-    "@pbi-lineage-lenz/viewer": "2.0.0"
+    "@pbi-lineage-lenz/core": "file:vendor/pbi-lineage-lenz/packages/core",
+    "@pbi-lineage-lenz/viewer": "file:vendor/pbi-lineage-lenz/packages/viewer"
   },
   "keywords": [
     "power-bi",

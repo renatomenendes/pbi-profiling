@@ -1,0 +1,3 @@
+[submodule "vendor/pbi-lineage-lenz"]
+	path = vendor/pbi-lineage-lenz
+	url = https://github.com/JonathanJihwanKim/pbi-lineage-lenz.git
