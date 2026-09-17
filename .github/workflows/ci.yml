@@ -39,14 +39,16 @@ jobs:
       - name: Verify pinned upstream
         run: test "$(git -C vendor/pbi-lineage-lenz rev-parse HEAD)" = "7e2c61cac2f5e0ca6e7135df17a6918c89c42aec"
 
-      - name: Install dependencies
-        run: npm install --no-fund --no-audit
+      - name: Verify zero-install contract
+        run: |
+          test ! -d node_modules
+          node -e "const p=require('./package.json'); if (p.dependencies || p.devDependencies) process.exit(1)"
 
       - name: Syntax validation
-        run: npm run check
+        run: node ./scripts/check.js
 
       - name: Test suite
-        run: npm test
+        run: node ./scripts/test.js
 
       - name: CLI smoke test
         run: node ./src/cli.js --help

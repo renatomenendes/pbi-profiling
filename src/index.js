@@ -27,3 +27,4 @@ export {
 } from './context/load.js';
 export { renderEnhancedReportHtml } from './report/enhance.js';
 export { renderReportHtml } from './report/render.js';
+export { buildLineageGraph, renderLineageHtml } from './report/lineage.js';

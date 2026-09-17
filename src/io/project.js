@@ -22,7 +22,7 @@ import {
   describeProblem,
   partitionPbip,
   shouldRead,
-} from '@pbi-lineage-lenz/core';
+} from '../../vendor/pbi-lineage-lenz/packages/core/src/index.js';
 
 export function readProjectFolder(root) {
   const files = new Map();
