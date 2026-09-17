@@ -1,4 +1,11 @@
-export function buildHealthProfile(viewerModel, usage) {
+export function buildHealthProfile(
+  viewerModel,
+  usage,
+  {
+    pageMetadata = [],
+    brokenReferences = [],
+  } = {},
+) {
   const findings = [];
 
   const unresolvedColumns = (viewerModel.columns ?? []).filter(
@@ -21,8 +28,8 @@ export function buildHealthProfile(viewerModel, usage) {
     });
   }
 
-  const hiddenPages = (viewerModel.pages ?? []).filter(
-    (page) => page.isHidden,
+  const hiddenPages = pageMetadata.filter(
+    (page) => page.isHidden === true,
   );
 
   if (hiddenPages.length > 0) {
@@ -34,6 +41,25 @@ export function buildHealthProfile(viewerModel, usage) {
       evidence: hiddenPages.map((page) => ({
         id: page.id,
         name: page.name,
+        visibility: page.visibility,
+      })),
+    });
+  }
+
+  const pageParseErrors = pageMetadata.filter(
+    (page) => page.parseError,
+  );
+
+  if (pageParseErrors.length > 0) {
+    findings.push({
+      code: 'page-definition-parse-errors',
+      severity: 'warning',
+      title: 'Page definitions that could not be parsed completely',
+      count: pageParseErrors.length,
+      evidence: pageParseErrors.map((page) => ({
+        id: page.id,
+        sourcePath: page.sourcePath,
+        error: page.parseError,
       })),
     });
   }
@@ -97,16 +123,34 @@ export function buildHealthProfile(viewerModel, usage) {
     });
   }
 
+  if (brokenReferences.length > 0) {
+    findings.push({
+      code: 'broken-model-references',
+      severity: 'warning',
+      title: 'Broken references reported by the dependency engine',
+      count: brokenReferences.length,
+      evidence: brokenReferences,
+    });
+  }
+
   const confidence = viewerModel.stats?.confidence ?? null;
-  const coverage = confidence?.coverage ?? calculateCoverage(viewerModel.columns);
+  const coverage =
+    confidence?.coverage ??
+    calculateCoverage(viewerModel.columns);
 
   return {
     sourceResolutionCoverage: coverage,
     findings,
     counts: {
-      warnings: findings.filter((item) => item.severity === 'warning').length,
-      info: findings.filter((item) => item.severity === 'info').length,
-      errors: findings.filter((item) => item.severity === 'error').length,
+      warnings: findings.filter(
+        (item) => item.severity === 'warning',
+      ).length,
+      info: findings.filter(
+        (item) => item.severity === 'info',
+      ).length,
+      errors: findings.filter(
+        (item) => item.severity === 'error',
+      ).length,
     },
   };
 }
