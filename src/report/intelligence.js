@@ -1,5 +1,4 @@
 import {
-  escapeHtml,
   number,
   percent,
   text,
@@ -107,12 +106,16 @@ export function renderIntelligenceSection(profile) {
   const topTables = importance?.mostCentralTables?.slice(0, 10) ?? [];
   const opportunities = analytical?.opportunities ?? [];
   const capabilities = analytical?.capabilities ?? [];
+  const supported = opportunities.filter(
+    (item) => item.status !== 'insufficient-structural-evidence',
+  );
+  const supportedFamilies = new Set(supported.map((item) => item.family)).size;
 
   return `
     <section id="intelligence" class="section">
       ${sectionHeader(
         'Inteligência de profiling',
-        'Centralidade técnica, complexidade e potencial analítico derivados de evidência estrutural. Estes indicadores não substituem contexto de negócio nem validação estatística.',
+        'Centralidade técnica, complexidade e possibilidades analíticas derivadas de evidência estrutural. A ferramenta não assume que anomaly detection, forecasting ou qualquer outra técnica seja o objetivo do dashboard.',
       )}
 
       ${semanticConfigurationCallout(
@@ -123,10 +126,8 @@ export function renderIntelligenceSection(profile) {
         ${scoreCard('Complexidade combinada', complexity?.combined)}
         ${scoreCard('Modelo semântico', complexity?.semanticModel)}
         ${scoreCard('Relatório', complexity?.report)}
-        ${statCard(
-          opportunities.filter((item) => item.status === 'supported-candidate').length,
-          'Oportunidades com suporte forte',
-        )}
+        ${statCard(supported.length, 'Oportunidades a validar')}
+        ${statCard(supportedFamilies, 'Famílias analíticas observadas')}
         ${statCard(
           complexity?.hotspots?.length ?? 0,
           'Hotspots DAX',
@@ -163,13 +164,16 @@ export function renderIntelligenceSection(profile) {
       <div style="margin-top:22px">
         <h3>Oportunidades analíticas</h3>
         <p class="muted">
-          Uma oportunidade significa que a estrutura do PBIP contém sinais compatíveis com a análise.
-          Ela não afirma que o dado linha a linha tem qualidade, histórico ou poder preditivo suficiente.
+          O catálogo cobre análise descritiva, comportamento de processo, diagnóstico,
+          operações de dados, baseline, previsão e detecção de anomalias. Uma oportunidade
+          significa apenas que a estrutura do PBIP contém sinais compatíveis; ela não substitui
+          validação do dado, do contexto de negócio ou da utilidade operacional.
         </p>
         <div class="table-shell">
           <table>
             <thead>
               <tr>
+                <th>Família</th>
                 <th>Oportunidade</th>
                 <th>Status</th>
                 <th>Força estrutural</th>
@@ -201,6 +205,10 @@ export function renderIntelligenceSection(profile) {
             <strong>Semântica analítica</strong>
             <p class="muted">${text(analytical?.methodology?.semanticPolicy)}</p>
             <pre class="code">${text(JSON.stringify(analytical?.methodology?.semanticConfiguration, null, 2), '')}</pre>
+          </div>
+          <div>
+            <strong>Catálogo de oportunidades</strong>
+            <p class="muted">${text(analytical?.methodology?.opportunityPolicy)}</p>
           </div>
         </div>
       </details>
@@ -272,6 +280,7 @@ function renderOpportunityRow(item) {
 
   return `
     <tr>
+      <td><span class="badge">${text(familyLabel(item.family))}</span></td>
       <td><strong>${text(item.title)}</strong></td>
       <td><span class="badge ${kind}">${text(statusLabel(item.status))}</span></td>
       <td>${percent(item.strength, 0)}</td>
@@ -281,7 +290,7 @@ function renderOpportunityRow(item) {
           <summary>${number(item.evidence?.length ?? 0)} evidências · ${number(item.prerequisites?.length ?? 0)} pré-requisitos</summary>
           <strong>Evidência</strong>
           ${simpleList(item.evidence)}
-          <strong>Antes de modelar</strong>
+          <strong>Antes de aplicar</strong>
           ${simpleList(item.prerequisites)}
           <p class="muted">${text(item.caveat)}</p>
         </details>
@@ -384,6 +393,18 @@ function statusLabel(status) {
     .replace('supported candidate', 'candidato bem suportado')
     .replace('candidate needs validation', 'candidato a validar')
     .replace('insufficient structural evidence', 'evidência estrutural insuficiente');
+}
+
+function familyLabel(family) {
+  return ({
+    descriptive: 'Descritiva',
+    'process-behavior': 'Processo',
+    diagnostic: 'Diagnóstico',
+    'data-operations': 'Operação de dados',
+    'baseline-modeling': 'Baseline',
+    forecasting: 'Previsão',
+    'anomaly-detection': 'Anomalias',
+  })[family] ?? family ?? 'Outros';
 }
 
 function bandLabel(band) {
