@@ -18,6 +18,15 @@ test('dependency-free lineage renderer builds a self-contained interactive graph
       modelName: 'Sample.SemanticModel',
       reportName: 'Sample.Report',
     },
+    sourceResolution: {
+      tables: [
+        {
+          table: 'Fact',
+          level: 'physical-table',
+          scope: 'external',
+        },
+      ],
+    },
     semanticModel: {
       tables: [
         {
@@ -79,4 +88,56 @@ test('dependency-free lineage renderer builds a self-contained interactive graph
   assert.match(html, /Lineage técnico/);
   assert.equal(html.includes('<script src='), false);
   assert.equal(html.includes('https://registry.npmjs.org'), false);
+});
+
+test('lineage renderer handles Web resource objects without string coercion', () => {
+  const profile = {
+    meta: {
+      projectName: 'WebSample',
+      modelName: 'WebSample.SemanticModel',
+      reportName: 'WebSample.Report',
+    },
+    sourceResolution: {
+      tables: [
+        {
+          table: 'WebFact',
+          level: 'resource',
+          scope: 'external',
+        },
+      ],
+    },
+    semanticModel: {
+      tables: [
+        {
+          name: 'WebFact',
+          kind: 'table',
+          columnCount: 2,
+          measureCount: 0,
+          physicalPath: null,
+          physical: {
+            system: 'Web',
+            url: 'https://example.invalid/data.parquet',
+            table: null,
+          },
+        },
+      ],
+      measures: [],
+      relationships: [],
+    },
+    report: {
+      pages: [],
+      visuals: [],
+    },
+  };
+
+  const graph = buildLineageGraph(profile);
+  const html = renderLineageHtml(profile);
+  const source = graph.nodes.find((node) => node.kind === 'source');
+
+  assert.equal(source.label, 'Web');
+  assert.equal(source.subtitle, 'recurso Web');
+  assert.match(source.description, /recurso/);
+  assert.equal(html.includes('[object Object]'), false);
+  assert.equal(html.includes('example.invalid'), false);
+  assert.ok(graph.edges.some((edge) => edge.type === 'source-table'));
 });
