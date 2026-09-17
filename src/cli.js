@@ -4,8 +4,6 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { buildHandoff } from '@pbi-lineage-lenz/handoff';
-
 import { loadBusinessContext } from './context/load.js';
 import { analyzeProject } from './engine/analyze.js';
 import {
@@ -15,11 +13,16 @@ import {
 import { renderExtendedRagJsonl } from './export/rag-extended.js';
 import { buildProfile } from './profile/build.js';
 import { renderEnhancedReportHtml } from './report/enhance.js';
+import { renderLineageHtml } from './report/lineage.js';
 
 const USAGE = `
 pbi-profiling profile <pbip-directory> --output <directory> [--context <file>]
 
 Build a read-only, self-contained profile of a Power BI PBIP project.
+
+Runtime requirements:
+  Node.js 20+ and the repository cloned with its Git submodule.
+  No npm install is required for profiling execution.
 
 Outputs:
   profile.html       Human-oriented offline runbook.
@@ -86,19 +89,10 @@ export async function runCli(args = process.argv.slice(2)) {
   const profile = buildProfile(result, {
     businessContext,
   });
-  const lineage = await buildHandoff(
-    result.viewerModel,
-    {
-      title:
-        profile.meta.reportName ||
-        profile.meta.modelName ||
-        profile.meta.projectName,
-      strictSize: false,
-    },
-  );
+  const lineageHtml = renderLineageHtml(profile);
   const reportHtml = renderEnhancedReportHtml({
     profile,
-    lineageHtml: lineage.html,
+    lineageHtml,
   });
   const ragJsonl = renderExtendedRagJsonl(profile);
   const outputDirectory = resolve(values.output);
@@ -141,7 +135,7 @@ export async function runCli(args = process.argv.slice(2)) {
           profile.analytical.opportunities.filter(
             (item) => item.status !== 'insufficient-structural-evidence',
           ).length,
-        lineageWarnings: lineage.warnings,
+        lineageWarnings: [],
       },
       null,
       2,
