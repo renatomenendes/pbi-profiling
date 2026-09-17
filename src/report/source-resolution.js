@@ -28,8 +28,8 @@ export function renderSourceResolutionSection(profile) {
           <div class="eyebrow">Origem dos dados</div>
           <h2>Resolução de fontes</h2>
           <p>
-            Duas coberturas diferentes são mostradas para não confundir um recurso físico
-            reconhecido com uma coluna física endereçável. Fontes Web e arquivos podem ser
+            A origem é separada em três classes para evitar falsos gaps: fontes externas,
+            valores inline/model-local e colunas calculadas. Fontes Web e arquivos podem ser
             corretamente identificados mesmo quando o PBIP não expõe um objeto equivalente a
             database/schema/table/column.
           </p>
@@ -37,26 +37,31 @@ export function renderSourceResolutionSection(profile) {
       </div>
 
       <div class="grid stats-grid">
-        ${stat(summary.resourceLineageCoverage, 'Lineage até recurso', true)}
-        ${stat(summary.physicalColumnCoverage, 'Lineage até coluna física', true)}
-        ${stat(summary.resourceResolved, 'Colunas no nível de recurso')}
+        ${stat(summary.resourceLineageCoverage, 'Lineage externo até recurso', true)}
+        ${stat(summary.physicalColumnCoverage, 'Lineage externo até coluna física', true)}
+        ${stat(summary.resourceResolved, 'Colunas em recurso externo')}
+        ${stat(summary.inlineColumns, 'Colunas inline/model-local')}
         ${stat(summary.unresolvedColumns, 'Colunas ainda sem explicação')}
         ${stat(summary.computedColumns, 'Colunas calculadas')}
-        ${stat(summary.externalResourceTables, 'Tabelas com recurso externo')}
       </div>
 
       <div class="grid grid-2" style="margin-top:14px">
         <article class="card">
           <div class="kicker">Como interpretar</div>
           <p>
-            <strong>Lineage até recurso</strong> significa que a coluna foi associada, no mínimo,
-            ao recurso físico que alimenta a tabela — por exemplo, uma URL Web ou um arquivo.
-            Isso não prova o nome de uma coluna no sistema de origem.
+            <strong>Lineage externo até recurso</strong> significa que uma coluna que depende de
+            fonte externa foi associada, no mínimo, ao recurso físico que alimenta a tabela — por
+            exemplo, uma URL Web ou um arquivo. Isso não prova o nome de uma coluna no sistema de origem.
           </p>
-          <p class="muted" style="margin-bottom:0">
-            <strong>Lineage até coluna física</strong> é mais estrito: exige um objeto físico
+          <p class="muted">
+            <strong>Lineage externo até coluna física</strong> é mais estrito: exige um objeto físico
             endereçável e uma coluna mapeada. Portanto, cobertura física baixa não é automaticamente
             um erro quando o conector entrega um recurso sem semântica de tabela.
+          </p>
+          <p class="muted" style="margin-bottom:0">
+            <strong>Inline/model-local</strong> representa valores incorporados ao próprio PBIP ou ao
+            Power Query. Esses objetos são explicados localmente e ficam fora do denominador de cobertura
+            externa, inclusive quando outra tabela os consome por join.
           </p>
         </article>
 
@@ -64,10 +69,12 @@ export function renderSourceResolutionSection(profile) {
           <div class="kicker">Classificação atual</div>
           <p style="margin-bottom:0">
             Das <strong>${number(summary.traceableColumns)}</strong> colunas que requerem lineage de
-            origem, <strong>${number(summary.physicalColumnResolved)}</strong> chegaram a uma coluna
-            física, <strong>${number(summary.resourceResolved)}</strong> chegaram ao recurso físico e
-            <strong>${number(summary.unresolvedColumns)}</strong> permanecem sem resolução suficiente.
-            ${number(summary.computedColumns)} coluna(s) calculada(s) ficam fora desse denominador.
+            origem externa, <strong>${number(summary.physicalColumnResolved)}</strong> chegaram a uma
+            coluna física, <strong>${number(summary.resourceResolved)}</strong> chegaram ao recurso
+            externo e <strong>${number(summary.unresolvedColumns)}</strong> permanecem sem resolução
+            suficiente. Além delas, <strong>${number(summary.inlineColumns)}</strong> coluna(s) terminam
+            em origem inline/model-local e <strong>${number(summary.computedColumns)}</strong> são
+            calculadas; ambas as classes ficam fora do denominador externo.
           </p>
         </article>
       </div>
@@ -103,7 +110,7 @@ function stat(value, label, isPercent = false) {
 function levelLabel(level) {
   return {
     'physical-table': 'Tabela física',
-    resource: 'Recurso físico',
+    resource: 'Recurso',
     unresolved: 'Não resolvida',
   }[level] ?? level;
 }

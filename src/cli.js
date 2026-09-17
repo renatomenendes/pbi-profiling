@@ -131,6 +131,8 @@ export async function runCli(args = process.argv.slice(2)) {
             profile.sourceResolution.summary.physicalColumnResolved,
           resourceResolved:
             profile.sourceResolution.summary.resourceResolved,
+          inlineColumns:
+            profile.sourceResolution.summary.inlineColumns,
           unresolvedColumns:
             profile.sourceResolution.summary.unresolvedColumns,
           computedColumns:

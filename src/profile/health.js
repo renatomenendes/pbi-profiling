@@ -26,7 +26,7 @@ export function buildHealthProfile(
     findings.push({
       code: 'resource-level-source-columns',
       severity: 'info',
-      title: 'Columns traced to a physical resource but not to an addressable physical column',
+      title: 'Columns traced to an external resource but not to an addressable physical column',
       count: resourceLevelColumns.length,
       evidence: resourceLevelColumns.map((column) => ({
         table: column.table,
@@ -34,6 +34,28 @@ export function buildHealthProfile(
         system: columnResolution.get(`${column.table}\u0000${column.name}`)?.system ?? null,
         reason: column.reason ?? null,
       })),
+    });
+  }
+
+  const inlineColumns = (viewerModel.columns ?? []).filter((column) =>
+    columnResolution.get(`${column.table}\u0000${column.name}`)?.level === 'inline',
+  );
+
+  if (inlineColumns.length > 0) {
+    findings.push({
+      code: 'inline-source-columns',
+      severity: 'info',
+      title: 'Columns whose lineage terminates in inline/model-local data',
+      count: inlineColumns.length,
+      evidence: inlineColumns.map((column) => {
+        const resolved = columnResolution.get(`${column.table}\u0000${column.name}`);
+        return {
+          table: column.table,
+          column: column.name,
+          sourceTable: resolved?.resolvedViaTable ?? column.table,
+          reason: column.reason ?? null,
+        };
+      }),
     });
   }
 

@@ -227,17 +227,52 @@ For analytical capabilities/opportunities, confidence reflects how many independ
 
 This is evidence convergence, not a probability.
 
+## Source resolution
+
+Source resolution intentionally separates external physical lineage from values that are local to the PBIP model.
+
+Column lineage is classified into these levels:
+
+- `physical-column`: the external physical table and column are addressable;
+- `resource`: an external resource such as a URL, file or service is known, but the PBIP does not expose an addressable physical source column;
+- `inline`: the values terminate in inline/model-local data embedded in the PBIP or Power Query, including columns inherited through a join from an inline table;
+- `computed`: the column is calculated in DAX or Power Query and therefore has no direct physical source column;
+- `model-defined`: model metadata such as calculation-group or field-parameter machinery;
+- `unresolved`: the available PBIP evidence does not explain the source lineage sufficiently.
+
+External coverage uses only columns that actually require external source lineage:
+
+```text
+external_traceable = physical_column + resource + unresolved
+
+physical_column_coverage =
+    physical_column / external_traceable
+
+resource_lineage_coverage =
+    (physical_column + resource) / external_traceable
+```
+
+Inline/model-local, computed and model-defined columns are excluded from that denominator. Their exclusion is not a waiver: their origin is already explained by the model itself, so asking them for an external physical source would create a false defect.
+
+A column joined from an inline lookup remains `inline` even when the consuming table itself is externally sourced. The profile retains the inline table that explains that dependency.
+
+Resource-level lineage must never be presented as an exact source-column mapping.
+
 ## Health
 
 Health findings are evidence-backed and enumerated. Current checks include:
 
-- unresolved physical-source columns;
+- external columns resolved only to resource level;
+- inline/model-local source columns;
+- genuinely unresolved source columns;
 - hidden pages;
 - malformed page definitions;
 - visuals never shown;
 - measures without observed usage;
 - unresolved visual bindings;
 - broken model references.
+
+Resource-level and inline/model-local findings are informational. Only genuinely unresolved source lineage is a source-resolution warning.
 
 Counts in the health summary count finding categories by severity. Each finding retains its occurrence count and concrete evidence.
 
