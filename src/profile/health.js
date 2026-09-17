@@ -26,12 +26,34 @@ export function buildHealthProfile(
     findings.push({
       code: 'resource-level-source-columns',
       severity: 'info',
-      title: 'Columns traced to a physical resource but not to an addressable physical column',
+      title: 'Columns traced to an external resource but not to an addressable physical column',
       count: resourceLevelColumns.length,
       evidence: resourceLevelColumns.map((column) => ({
         table: column.table,
         column: column.name,
         system: columnResolution.get(`${column.table}\u0000${column.name}`)?.system ?? null,
+        reason: column.reason ?? null,
+      })),
+    });
+  }
+
+  const inlineColumns = (viewerModel.columns ?? []).filter((column) =>
+    columnResolution.get(`${column.table}\u0000${column.name}`)?.level === 'inline',
+  );
+
+  if (inlineColumns.length > 0) {
+    findings.push({
+      code: 'inline-source-columns',
+      severity: 'info',
+      title: 'Columns whose lineage terminates in inline/model-local data',
+      count: inlineColumns.length,
+      evidence: inlineColumns.map((column) => ({
+        table: column.table,
+        column: column.name,
+        sourceTable:
+          columnResolution.get(`${column.table}\u0000${column.name}`)?.tableResolutionScope === 'inline'
+            ? columnResolution.get(`${column.table}\u0000${column.name}`)?.table ?? column.table
+            : null,
         reason: column.reason ?? null,
       })),
     });
