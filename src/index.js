@@ -16,6 +16,10 @@ export {
   renderRagJsonl,
 } from './export/rag.js';
 export {
+  buildExtendedRagChunks,
+  renderExtendedRagJsonl,
+} from './export/rag-extended.js';
+export {
   CONTEXT_SCHEMA_VERSION,
   DEFAULT_CONTEXT_FILE,
   loadBusinessContext,
