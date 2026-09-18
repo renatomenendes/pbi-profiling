@@ -30,11 +30,7 @@ async function waitForJob(
       },
     );
 
-    assert.equal(
-      response.status,
-      200,
-    );
-
+    assert.equal(response.status, 200);
     job = await response.json();
 
     if (
@@ -44,11 +40,9 @@ async function waitForJob(
       return job;
     }
 
-    await new Promise(
-      (resolvePromise) => {
-        setTimeout(resolvePromise, 50);
-      },
-    );
+    await new Promise((resolvePromise) => {
+      setTimeout(resolvePromise, 50);
+    });
   }
 
   return job;
@@ -56,15 +50,9 @@ async function waitForJob(
 
 test('local app exposes browser-native intake and preserves manual-path profiling', async () => {
   const root = mkdtempSync(
-    join(
-      tmpdir(),
-      'pbi-profiling-app-test-',
-    ),
+    join(tmpdir(), 'pbi-profiling-app-test-'),
   );
-  const project = join(
-    root,
-    'project',
-  );
+  const project = join(root, 'project');
   writePbipFixture(project);
 
   const app = await startLocalApp({
@@ -80,38 +68,37 @@ test('local app exposes browser-native intake and preserves manual-path profilin
 
     const html = await page.text();
 
-    assert.match(
-      html,
-      /Universal Intake/,
-    );
-    assert.match(
-      html,
-      /Selecionar PBIX/,
-    );
+    assert.match(html, /Universal Intake/);
+    assert.match(html, /Selecionar PBIX/);
     assert.match(
       html,
       /Selecionar pasta do projeto/,
     );
-    assert.match(
-      html,
-      /showDirectoryPicker/,
-    );
-    assert.match(
-      html,
-      /webkitdirectory/,
-    );
-    assert.match(
-      html,
-      /\/api\/jobs\/pbix/,
-    );
-    assert.doesNotMatch(
-      html,
-      /\/api\/picker/,
-    );
+    assert.match(html, /showDirectoryPicker/);
+    assert.match(html, /webkitdirectory/);
+    assert.match(html, /\/api\/jobs\/pbix/);
+    assert.doesNotMatch(html, /\/api\/picker/);
     assert.doesNotMatch(
       html,
       /WinForms|Windows Forms/i,
     );
+
+    for (const id of [
+      'pbix-file',
+      'pbix-select',
+      'pbix-run',
+      'project-folder-fallback',
+      'project-select',
+      'project-run',
+      'manual-path',
+      'manual-run',
+      'status-card',
+    ]) {
+      assert.match(
+        html,
+        new RegExp('id="' + id + '"'),
+      );
+    }
 
     const inlineScript =
       html.match(
@@ -122,28 +109,6 @@ test('local app exposes browser-native intake and preserves manual-path profilin
     assert.doesNotThrow(
       () => new Function(inlineScript),
     );
-
-    for (
-      const match of
-      inlineScript.matchAll(
-        /getElementById\('([^']+)'\)/g,
-      )
-    ) {
-      assert.match(
-        html,
-        new RegExp(
-          'id="' +
-          match[1].replace(
-            /[.*+?^$\{\}()|[\]\\]/g,
-            '\\    assert.doesNotMatch(
-      html,
-      /WinForms|Windows Forms/i,
-    );',
-          ) +
-          '"',
-        ),
-      );
-    }
 
     const unauthorized = await fetch(
       origin + '/api/jobs/path',
@@ -185,8 +150,7 @@ test('local app exposes browser-native intake and preserves manual-path profilin
       202,
     );
 
-    const created =
-      await create.json();
+    const created = await create.json();
 
     const job = await waitForJob(
       origin,
@@ -219,10 +183,6 @@ test('local app exposes browser-native intake and preserves manual-path profilin
     assert.equal(
       profileJson.overview.counts.tables,
       2,
-    );
-    assert.equal(
-      profileJson.meta.projectName,
-      'Browser selected project',
     );
   } finally {
     await app.close();
@@ -276,15 +236,10 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
       },
     );
 
-    assert.equal(
-      create.status,
-      201,
-    );
+    assert.equal(create.status, 201);
+    const created = await create.json();
 
-    const created =
-      await create.json();
-
-    for (const [path, content] of relevantFiles) {
+    for (const [path, fileContent] of relevantFiles) {
       const upload = await fetch(
         origin +
           '/api/projects/' +
@@ -300,16 +255,19 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
               app.token,
           },
           body: Buffer.from(
-            content,
+            fileContent,
             'utf-8',
           ),
         },
       );
 
+      const uploadText =
+        await upload.text();
+
       assert.equal(
         upload.status,
         201,
-        await upload.text(),
+        uploadText,
       );
     }
 
@@ -339,10 +297,7 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
     const validation =
       JSON.parse(validationText);
 
-    assert.equal(
-      validation.ready,
-      true,
-    );
+    assert.equal(validation.ready, true);
     assert.equal(
       validation.fileCount,
       relevantFiles.size,
@@ -362,13 +317,8 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
       },
     );
 
-    assert.equal(
-      run.status,
-      202,
-    );
-
-    const started =
-      await run.json();
+    assert.equal(run.status, 202);
+    const started = await run.json();
 
     const job = await waitForJob(
       origin,
@@ -390,12 +340,21 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
         app.token,
     );
 
+    assert.equal(
+      profile.status,
+      200,
+    );
+
     const profileJson =
       await profile.json();
 
     assert.equal(
       profileJson.overview.counts.tables,
       2,
+    );
+    assert.equal(
+      profileJson.meta.projectName,
+      'Browser selected project',
     );
   } finally {
     await app.close();
@@ -434,8 +393,7 @@ test('browser PBIP staging rejects unsafe relative paths', async () => {
       },
     );
 
-    const created =
-      await create.json();
+    const created = await create.json();
 
     const upload = await fetch(
       origin +
@@ -460,13 +418,9 @@ test('browser PBIP staging rejects unsafe relative paths', async () => {
       },
     );
 
-    assert.equal(
-      upload.status,
-      400,
-    );
+    assert.equal(upload.status, 400);
 
-    const payload =
-      await upload.json();
+    const payload = await upload.json();
 
     assert.match(
       payload.error,
@@ -525,10 +479,7 @@ test('PBIX upload contract remains streaming and accepts realistic corporate fil
       payload.jobId,
     );
 
-    assert.equal(
-      job?.status,
-      'failed',
-    );
+    assert.equal(job?.status, 'failed');
     assert.doesNotMatch(
       job.message,
       /ENOENT|no such file or directory/i,
