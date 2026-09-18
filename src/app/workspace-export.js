@@ -95,16 +95,17 @@ export async function exportWorkspaceToDirectory(
     requestedDestination,
   );
 
+  const sourcePrefix =
+    source.endsWith(sep)
+      ? source
+      : `${source}${sep}`;
+
   if (
     source === base ||
-    source.startsWith(
-      base.endsWith(sep)
-        ? base
-        : `${base}${sep}`,
-    )
+    base.startsWith(sourcePrefix)
   ) {
     throw new Error(
-      'The converted PBIP destination cannot contain the temporary conversion workspace.',
+      'The converted PBIP destination cannot be inside the temporary conversion workspace.',
     );
   }
 
