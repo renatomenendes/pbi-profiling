@@ -308,8 +308,7 @@ function Get-LiveModelInfo {
 
 function Wait-NewDesktopModel {
     param(
-        [Parameter(Mandatory = $true)]$PreviousWorkspaces,
-        [Parameter(Mandatory = $true)][DateTime]$StartedUtc,
+        [Parameter(Mandatory = $true)]$PreviousPorts,
         [Parameter(Mandatory = $true)][int]$TimeoutMs
     )
 
@@ -320,8 +319,7 @@ function Wait-NewDesktopModel {
         $current = @(
             Get-WorkspacePorts |
             Where-Object {
-                -not $PreviousWorkspaces.ContainsKey($_.Workspace) -and
-                $_.LastWriteTimeUtc -ge $StartedUtc.AddSeconds(-5)
+                -not $PreviousPorts.ContainsKey([string]$_.Port)
             } |
             Sort-Object LastWriteTimeUtc -Descending
         )
@@ -356,8 +354,11 @@ function Wait-NewDesktopModel {
 
     throw @'
 Power BI Desktop was launched, but no new stable local semantic model became
-available before the timeout. The PBIX may still be loading, waiting for user
+available before the timeout. Do not save the file manually as PBIP: this
+adapter never requires Save As. The PBIX may still be loading, waiting for user
 interaction, blocked by credentials, or already open in another Desktop session.
+If this PBIX was already open before profiling, close that window and retry so
+the adapter can correlate a newly created Analysis Services port safely.
 '@
 }
 
@@ -656,19 +657,17 @@ $desktopExecutable = Get-PowerBIDesktopExecutable
 $tomDirectory = Get-TomDirectory -DesktopExecutable $desktopExecutable
 Import-TomAssemblies -TomDirectory $tomDirectory
 
-$before = @{}
+$beforePorts = @{}
 foreach ($workspace in Get-WorkspacePorts) {
-    $before[$workspace.Workspace] = $true
+    $beforePorts[[string]$workspace.Port] = $true
 }
 
-$startedUtc = [DateTime]::UtcNow
-
-Write-ProgressEvent -Phase 'opening-desktop' -Message 'Opening PBIX in Power BI Desktop to materialize the semantic model.'
+Write-ProgressEvent -Phase 'opening-desktop' -Message 'Opening PBIX in Power BI Desktop to materialize the semantic model. No manual Save As is required.'
 $quotedPbix = '"' + $pbix.Replace('"', '""') + '"'
 $desktopProcess = Start-Process -FilePath $desktopExecutable -ArgumentList $quotedPbix -PassThru
 
 Write-ProgressEvent -Phase 'waiting-model' -Message 'Waiting for a new stable local Analysis Services model.'
-$modelSession = Wait-NewDesktopModel -PreviousWorkspaces $before -StartedUtc $startedUtc -TimeoutMs $timeoutMs
+$modelSession = Wait-NewDesktopModel -PreviousPorts $beforePorts -TimeoutMs $timeoutMs
 
 Write-ProgressEvent -Phase 'serializing-tmdl' -Message 'Serializing the live semantic model with Microsoft TOM.'
 $modelInfo = Export-Tmdl -Port $modelSession.Port -Destination $modelDefinition -ProjectName $projectName

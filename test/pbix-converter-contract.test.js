@@ -60,3 +60,30 @@ test('PBIX converter refuses legacy report layout instead of fabricating PBIR', 
     /refuses to approximate/i,
   );
 });
+
+
+test('PBIX model detection correlates by new Analysis Services port, not workspace timestamp', () => {
+  const source = readFileSync(
+    resolve(
+      'scripts/windows/convert-pbix.ps1',
+    ),
+    'utf-8',
+  );
+
+  assert.match(
+    source,
+    /PreviousPorts/,
+  );
+  assert.match(
+    source,
+    /ContainsKey\(\[string\]\$_.Port\)/,
+  );
+  assert.doesNotMatch(
+    source,
+    /PreviousWorkspaces/,
+  );
+  assert.match(
+    source,
+    /No manual Save As is required/i,
+  );
+});
