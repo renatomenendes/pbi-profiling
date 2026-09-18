@@ -1,7 +1,7 @@
 {
   "name": "pbi-profiling",
-  "version": "0.5.0",
-  "description": "Human-oriented profiling, documentation and analysis for Power BI PBIP projects.",
+  "version": "1.0.0",
+  "description": "Local, read-only profiling and documentation for Power BI PBIP projects.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -32,5 +32,6 @@
     "rag",
     "data-quality"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "private": true
 }
