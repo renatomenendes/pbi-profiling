@@ -14,7 +14,7 @@
 - Integration: Git submodule at `vendor/pbi-lineage-lenz`; runtime imports the audited source directly from the pinned submodule and does not install or resolve npm packages.
 - Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, dependency graph/lineage facts, the serializable viewer model and the browser-folder intake pattern (`showDirectoryPicker` with `webkitdirectory` fallback and relevant-file filtering).
 
-The original MIT license remains applicable to the upstream source. The submodule preserves the upstream repository history and license verbatim.
+The original MIT license remains applicable to the upstream source. Development checkouts preserve the upstream repository through the Git submodule. Official portable releases materialize only the audited runtime source required by `pbi-profiling` and include the upstream MIT license in `vendor/pbi-lineage-lenz/LICENSE`.
 
 The browser-folder intake in `src/app/page.js` adapts the architecture of upstream `apps/web/src/readFolder.js`: File System Access API when available, `webkitdirectory` fallback otherwise, and the same relevant-file/skip-directory contract enforced again on the server through the pinned core `shouldRead()` function.
 

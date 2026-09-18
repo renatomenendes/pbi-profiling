@@ -82,3 +82,71 @@ jobs:
           }
 
           Write-Host "Windows PowerShell syntax OK: $script"
+
+      - name: Verify Windows launcher contract
+        shell: powershell
+        run: |
+          $launcher = Get-Content -LiteralPath '.\pbi-profiling.cmd' -Raw
+
+          if ($launcher -notmatch 'Node\.js 20') {
+            throw 'Launcher does not enforce the Node.js 20 minimum.'
+          }
+
+          if ($launcher -notmatch 'src\\app\.js') {
+            throw 'Launcher does not start the local application.'
+          }
+
+          if ($launcher -match 'npm install|ExecutionPolicy') {
+            throw 'Launcher violates the zero-install contract.'
+          }
+
+  package-contract:
+    name: Portable package contract
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - powershell-contract
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build portable package
+        run: node ./scripts/package-release.js
+
+      - name: Create synthetic PBIP
+        env:
+          FIXTURE_DIR: ${{ runner.temp }}/release-fixture
+        run: |
+          node --input-type=module -e "import { writePbipFixture } from './test/fixtures/pbip.js'; writePbipFixture(process.env.FIXTURE_DIR);"
+
+      - name: Smoke test packaged runtime
+        env:
+          FIXTURE_DIR: ${{ runner.temp }}/release-fixture
+          OUTPUT_DIR: ${{ runner.temp }}/release-output
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          PACKAGE_DIR="dist/pbi-profiling-v${VERSION}-windows-portable"
+
+          test -f "${PACKAGE_DIR}/pbi-profiling.cmd"
+          test -f "${PACKAGE_DIR}/LICENSE"
+          test -f "${PACKAGE_DIR}/RELEASE-MANIFEST.json"
+          test -f "${PACKAGE_DIR}/vendor/pbi-lineage-lenz/LICENSE"
+
+          node "${PACKAGE_DIR}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
+
+          test -s "${OUTPUT_DIR}/profile.html"
+          test -s "${OUTPUT_DIR}/profile.json"
+          test -s "${OUTPUT_DIR}/profile.rag.jsonl"
+
+          if find "${PACKAGE_DIR}" -name .git -o -name node_modules -o -name coverage | grep -q .; then
+            echo "Forbidden development content found in release package."
+            exit 1
+          fi

@@ -1,92 +1,186 @@
 # pbi-profiling
 
-Ferramenta read-only para profiling, discovery, auditoria e documentação de projetos Power BI a partir de PBIP. Quando a origem está em PBIX, a aplicação pode abrir o arquivo no Power BI Desktop para que o usuário o salve oficialmente como Power BI Project (.pbip) antes do profiling.
+`pbi-profiling` é uma ferramenta local e read-only para profiling, discovery, auditoria e documentação de projetos Power BI em formato PBIP.
 
-O objetivo é transformar artefatos técnicos de Power BI em um runbook navegável para pessoas técnicas e não técnicas, preservando rastreabilidade até fontes, tabelas, colunas, medidas, páginas e visuais — no espírito de progressive disclosure de ferramentas de profiling como `pandas-profiling`, mas aplicado ao ecossistema PBIP.
+Ela transforma TMDL, PBIR, DAX, Power Query/M, fontes, relacionamentos, páginas e visuais em um runbook navegável e em artefatos estruturados para auditoria, automação e RAG.
 
-## Princípios
+## Principais capacidades
 
-- reutilizar projetos open source maduros antes de reimplementar capacidades existentes;
-- preservar proveniência e licenças de todo código reutilizado;
-- separar extração, análise, contexto de negócio, configuração heurística e apresentação;
-- manter a inspeção estritamente read-only sobre projetos PBIP;
-- diferenciar fatos extraídos, heurísticas estruturais e contexto humano declarado;
-- nunca inferir “valor de negócio” a partir de centralidade técnica;
-- não embutir vocabulário de um cliente, dashboard ou domínio no núcleo analítico;
-- produzir artefatos estruturados para auditoria/automação e uma saída HTML orientada a humanos;
-- manter indicadores explicáveis: componentes, pesos, evidências e caveats permanecem no contrato;
-- funcionar em estações corporativas sem privilégio administrativo e sem instalação de pacotes npm para execução;
-- evoluir por branches e pull requests verificáveis, com CI e testes de contrato.
+- profiling de modelos semânticos TMDL;
+- leitura de PBIR;
+- catálogo de tabelas, colunas, medidas e relacionamentos;
+- análise de DAX e Power Query/M;
+- resolução de fontes físicas;
+- lineage e impacto;
+- inventário de páginas, visuais e bookmarks;
+- uso direto e transitivo;
+- importância estrutural;
+- complexidade;
+- saúde e manutenção;
+- oportunidades analíticas;
+- contexto de negócio opcional;
+- runbook HTML autocontido;
+- exportação JSON e JSONL para RAG.
 
-## Engine
+## Download
 
-A leitura técnica do PBIP usa `pbi-lineage-lenz` como engine pinada por commit, via Git submodule. Ela fornece parsing e normalização de TMDL, PBIR, DAX, Power Query/M, fontes físicas, dependências e lineage.
+A distribuição oficial é publicada em **GitHub Releases** como:
 
-O runtime importa diretamente o código-fonte auditado do submodule pinado. Não depende de `node_modules` nem de resolução de pacotes no registry npm.
+```text
+pbi-profiling-v<version>-windows-portable.zip
+SHA256SUMS.txt
+```
 
-O `pbi-profiling` adiciona a camada de produto: profiling, contexto, onboarding, saúde, relevância analítica, oportunidades, impacto de manutenção e runbook humano.
+Use o ZIP do release, não o archive automático de source code do GitHub. O pacote oficial já contém a dependência upstream pinada necessária em runtime.
 
-Veja `ATTRIBUTIONS.md` para provenance e licenças.
+Consulte `docs/INSTALLATION.md` para instalação e verificação de checksum.
+
+## Requisitos
+
+- Windows 10 ou 11;
+- Node.js 20 ou superior;
+- Power BI Desktop apenas para o fluxo opcional com PBIX.
+
+Não é necessário:
+
+- `npm install`;
+- Python;
+- privilégio administrativo;
+- mudança de PowerShell ExecutionPolicy;
+- CDN;
+- serviço externo.
+
+## Início rápido
+
+Depois de extrair o pacote:
+
+```powershell
+.\pbi-profiling.cmd
+```
+
+A aplicação abre no navegador e usa apenas o servidor local em `127.0.0.1`.
+
+### Se você já possui PBIP
+
+```text
+Selecionar pasta PBIP
+→ validar estrutura
+→ Gerar runbook
+→ Abrir runbook / Exportar HTML / JSON / RAG
+```
+
+### Se a origem é PBIX
+
+```text
+Selecionar PBIX
+→ Abrir no Power BI Desktop
+→ File > Save As > Power BI Project (.pbip)
+→ Selecionar pasta PBIP
+→ validar
+→ Gerar runbook
+```
+
+PBIX não é convertido programaticamente pelo profiler. Power BI Desktop é a autoridade para materializar o PBIP oficial.
+
+PBIT não é entrada de profiling.
 
 ## Saídas
 
-Uma execução produz três artefatos derivados do mesmo contrato:
+Cada execução aprovada gera:
 
-- `profile.html` — runbook humano autocontido e offline;
+- `profile.html` — runbook humano autocontido;
 - `profile.json` — contrato estruturado e auditável;
-- `profile.rag.jsonl` — chunks autocontidos para busca, RAG e agentes.
+- `profile.rag.jsonl` — chunks autocontidos para busca/RAG/agentes.
 
-O HTML inclui:
+Na aplicação local:
 
-- visão geral executiva;
-- contexto de negócio, quando fornecido;
-- páginas e wireframe aproximado do layout;
-- catálogo de medidas e DAX;
-- tabelas, fontes, relacionamentos e Power Query/M;
-- centralidade/importância estrutural;
-- complexidade explícita por componentes;
-- capacidades e oportunidades analíticas;
-- lineage interativo offline sem bibliotecas externas de runtime;
-- uso direto/transitivo;
-- qualidade e cobertura;
-- manutenção e impacto de mudança;
-- detalhes técnicos sob demanda.
+- **Abrir runbook** abre o HTML no navegador;
+- **Exportar HTML** salva `profile.html`;
+- **profile.json** baixa o JSON;
+- **profile.rag.jsonl** baixa o JSONL.
+
+Veja `docs/OUTPUTS.md` para os contratos de saída.
 
 ## Contrato de entrada
 
-O artefato de profiling é **PBIP**. O pipeline aceita:
+O artefato de profiling é **PBIP**.
 
-- pasta raiz de projeto PBIP;
+Entradas aceitas:
+
+- pasta raiz PBIP;
 - arquivo `.pbip`;
 - pasta `.SemanticModel`;
 - pasta `.Report`.
 
-PBIX e PBIT não são convertidos pelo profiler. Quando a origem está em PBIX, o fluxo suportado é:
+Antes do profiling, a aplicação exige:
+
+- pelo menos um arquivo TMDL;
+- pelo menos uma tabela semântica parseável;
+- estrutura PBIP/PBIR válida.
+
+Projetos estruturalmente vazios são bloqueados.
+
+## Privacidade e segurança
+
+- análise local;
+- PBIP tratado de forma read-only;
+- servidor apenas em loopback;
+- API protegida por token aleatório de sessão;
+- runbook sem CDN;
+- nenhum dado corporativo faz parte do repositório ou dos fixtures públicos;
+- caminhos absolutos da estação não são persistidos no `profile.json` por padrão.
+
+Consulte `SECURITY.md`.
+
+## Arquitetura
+
+A engine de interpretação PBIP usa `pbi-lineage-lenz` pinado no commit:
 
 ```text
-PBIX
-  │
-  ▼
-Power BI Desktop
-  │
-  ├─ File > Save As
-  └─ Power BI Project (.pbip)
-  │
-  ▼
-PBIP / TMDL / PBIR
-  │
-  ▼
-validação estrutural
-  │
-  ▼
-pbi-profiling
+7e2c61cac2f5e0ca6e7135df17a6918c89c42aec
 ```
 
-Essa separação é deliberada: o Power BI Desktop é o responsável por materializar o formato PBIP oficial; o `pbi-profiling` permanece responsável por validação, profiling, lineage, documentação e geração dos artefatos finais.
+O runtime importa o código-fonte auditado diretamente, sem dependências npm instaladas.
 
-Antes de gerar um runbook, o profiler exige um modelo semântico TMDL real e pelo menos uma tabela parseável. Um diretório com apenas metadados `.platform`, `definition.pbir` ou outros arquivos auxiliares não é aceito como projeto profileável.
+A arquitetura e as fronteiras do produto estão documentadas em `docs/ARCHITECTURE.md`.
 
-Para uso via CLI, forneça um PBIP já salvo:
+## Contexto de negócio opcional
+
+A raiz do PBIP pode conter:
+
+```text
+pbi-profiling.context.json
+```
+
+Esse sidecar declara significado de negócio, como propósito, audiência, grain e expectativas operacionais.
+
+A ausência do contexto é válida. O profiler não fabrica significado de negócio.
+
+Schema:
+
+```text
+schemas/pbi-profiling.context.schema.json
+```
+
+## Configuração semântica opcional
+
+A raiz também pode conter:
+
+```text
+pbi-profiling.config.json
+```
+
+Esse arquivo controla apenas heurísticas de profiling e não altera fatos extraídos do PBIP.
+
+Schema:
+
+```text
+schemas/pbi-profiling.config.schema.json
+```
+
+## CLI
+
+Para automação sobre PBIP já salvo:
 
 ```powershell
 node .\src\cli.js profile `
@@ -94,43 +188,9 @@ node .\src\cli.js profile `
     --output ".\output\MeuProjeto"
 ```
 
-## Aplicação local
+## Desenvolvimento
 
-A UI local zero-install está disponível com:
-
-```powershell
-node .\src\app.js
-```
-
-O fluxo é explícito e sequencial:
-
-1. se a origem estiver em PBIX, selecione o arquivo e clique em **Abrir no Power BI Desktop**;
-2. no Desktop, use **File > Save As > Power BI Project (.pbip)**;
-3. volte à aplicação e clique em **Selecionar pasta PBIP**;
-4. a aplicação valida TMDL, tabelas, páginas e visuais;
-5. somente um PBIP válido habilita **Gerar runbook**;
-6. após o profiling concluído, ficam disponíveis **Abrir runbook**, `profile.json` e `profile.rag.jsonl`.
-
-Se o usuário já possui PBIP, começa diretamente no passo 3.
-
-O botão de PBIX não converte o arquivo. Ele apenas envia uma cópia local temporária ao servidor em `127.0.0.1` e abre essa cópia no Power BI Desktop instalado. A aplicação não usa TOM/TmdlSerializer para converter PBIX e não tenta reconstruir PBIP programaticamente.
-
-A seleção de pasta PBIP usa `showDirectoryPicker()` quando disponível e `webkitdirectory` como fallback. O servidor reaplica o contrato de arquivos relevantes e valida estruturalmente o projeto antes do profiling.
-
-A UI não usa CDN, telemetria, WinForms, serviços externos, elevação, mudança de ExecutionPolicy ou instalação de pacotes.
-
-## Execução zero-install
-
-Requisitos de runtime:
-
-- Node.js 20 ou superior;
-- Git com suporte a submodules;
-- repositório clonado com o submodule pinado;
-- para o atalho **Abrir PBIX no Desktop**: Windows e Power BI Desktop já instalado.
-
-Não é necessário executar `npm install`, `npm ci`, `npm update` ou instalar qualquer pacote JavaScript na estação.
-
-Clone uma vez:
+Clone com submodules:
 
 ```powershell
 git clone --recurse-submodules https://github.com/renatomenendes/pbi-profiling.git
@@ -138,195 +198,32 @@ Set-Location .\pbi-profiling
 git submodule update --init --recursive
 ```
 
-Execute diretamente com Node:
-
-```powershell
-node .\src\cli.js profile `
-    "C:\caminho\para\meu-projeto-pbip" `
-    --output ".\output\meu-projeto"
-```
-
-Validações locais também não dependem de npm:
+Gates locais:
 
 ```powershell
 node .\scripts\check.js
 node .\scripts\test.js
 node .\src\cli.js --help
+node .\scripts\package-release.js
 ```
 
-## Contexto de negócio opcional
+O CI valida Node.js 20, 22 e 24, Windows PowerShell 5.1, contrato zero-install e o pacote portátil real.
 
-PBIP descreve muito bem estrutura técnica, mas não prova finalidade, owner, uso operacional, SLA ou definição de negócio. Para manter essa fronteira explícita, o `pbi-profiling` aceita um sidecar opcional chamado:
+## Documentação
 
-```text
-pbi-profiling.context.json
-```
+- `docs/INSTALLATION.md` — instalação e atualização;
+- `docs/USER-GUIDE.md` — fluxo de uso;
+- `docs/OUTPUTS.md` — contratos de saída;
+- `docs/ARCHITECTURE.md` — arquitetura;
+- `docs/METHODOLOGY.md` — metodologia de profiling;
+- `docs/RELEASING.md` — processo de release;
+- `CHANGELOG.md` — histórico de versões;
+- `SECURITY.md` — política de segurança;
+- `CONTRIBUTING.md` — contribuição;
+- `ATTRIBUTIONS.md` e `THIRD_PARTY_NOTICES.md` — proveniência e licenças.
 
-Quando o arquivo está na raiz do projeto analisado, ele é detectado automaticamente. Também pode ser informado explicitamente:
+## Licença
 
-```powershell
-node .\src\cli.js profile `
-    ".\MeuProjeto" `
-    --output ".\output" `
-    --context ".\documentacao\context.json"
-```
+MIT. Consulte `LICENSE`.
 
-Exemplo mínimo:
-
-```json
-{
-  "schemaVersion": 1,
-  "dashboard": {
-    "purpose": "Acompanhar indicadores de desempenho do processo.",
-    "audience": ["Operação", "Gestão"],
-    "businessQuestions": [
-      "Onde os principais indicadores estão se desviando do comportamento esperado?"
-    ],
-    "refresh": {
-      "cadence": "Diária"
-    }
-  },
-  "tables": {
-    "FactEvents": {
-      "grain": "Entidade x instante de observação",
-      "businessMeaning": "Histórico de observações do processo"
-    }
-  }
-}
-```
-
-A ausência do sidecar é válida. Nesse caso, o runbook declara explicitamente que o contexto não foi fornecido, em vez de fabricá-lo.
-
-## Configuração semântica opcional
-
-A relevância analítica funciona sem configuração específica de domínio. Por padrão, o profiler usa:
-
-- tipos de dados;
-- relações do modelo;
-- papéis dos campos nos visuais;
-- padrões DAX;
-- tipos de visual;
-- um vocabulário bilíngue pequeno e genérico para conceitos como data, estado, duração, identificador e freshness.
-
-O núcleo não contém substantivos de negócio como equipamento, cliente, fornecedor, município, câmera, produto ou qualquer outro conceito específico de um projeto.
-
-Quando um domínio utiliza nomes próprios que não podem ser inferidos estruturalmente, um sidecar separado pode acrescentar hints:
-
-```text
-pbi-profiling.config.json
-```
-
-Ele é detectado automaticamente na raiz do PBIP ou pode ser passado por `--config`:
-
-```powershell
-node .\src\cli.js profile `
-    ".\MeuProjeto" `
-    --output ".\output" `
-    --config ".\documentacao\profiling.json"
-```
-
-Exemplo:
-
-```json
-{
-  "schemaVersion": 1,
-  "analysis": {
-    "semanticHints": {
-      "mode": "extend",
-      "terms": {
-        "state": ["mode"],
-        "entity": ["account"]
-      },
-      "columns": {
-        "FactEvents[ObservedAt]": ["temporal"],
-        "FactEvents[AccountCode]": ["entity"]
-      }
-    }
-  }
-}
-```
-
-`extend` preserva a semântica genérica e adiciona vocabulário local. `replace` desativa o vocabulário padrão e usa somente os hints fornecidos. Tipos, relações, papéis de visuais e DAX continuam sendo evidência estrutural em ambos os modos.
-
-Cada sinal analítico registra a base da inferência, por exemplo `data-type:temporal`, `relationship-key`, `visual-grouping-role`, `default-lexicon`, `custom-semantic-term` ou `explicit-column-hint`. O HTML informa se a análise foi genérica ou configurada.
-
-Contexto e configuração são deliberadamente separados:
-
-- `pbi-profiling.context.json` declara significado de negócio;
-- `pbi-profiling.config.json` controla somente heurísticas de profiling.
-
-## Inteligência de profiling
-
-### Importância estrutural
-
-Mede centralidade técnica, não valor de negócio. Para medidas considera abrangência em visuais/páginas e fanout de dependências diretas/transitivas. Para tabelas considera exposição em visuais/páginas, breadth de objetos, grau de relacionamentos e medidas dependentes.
-
-Todos os pesos e componentes aparecem em `profile.json` e no HTML.
-
-### Complexidade
-
-A complexidade de DAX observa, entre outros sinais:
-
-- tamanho da expressão;
-- variedade de padrões DAX;
-- breadth de dependências;
-- profundidade de parênteses;
-- variáveis, linhas e densidade estrutural.
-
-O modelo e o relatório também recebem indicadores normalizados. Os scores são indicadores de complexidade estrutural, não notas de qualidade.
-
-### Relevância analítica
-
-A ferramenta detecta sinais estruturais genéricos como:
-
-- colunas temporais;
-- estados/estágios;
-- duração/persistência;
-- entidades/grupos;
-- timestamps de freshness;
-- variáveis numéricas;
-- medidas de time intelligence;
-- visuais de série temporal.
-
-A partir desses sinais gera candidatos transparentes para:
-
-- anomalia pontual;
-- anomalia contextual;
-- anomalia coletiva;
-- transições de estado;
-- persistência/duração;
-- freshness;
-- comparação entre pares;
-- baseline sazonal.
-
-Uma oportunidade significa somente que a estrutura é compatível. Validação de grain, histórico, cadência, qualidade de dados e utilidade operacional deve ocorrer sobre os dados reais antes de qualquer modelo.
-
-## RAG
-
-`profile.rag.jsonl` contém chunks autocontidos por entidade lógica, incluindo overview, página, tabela, medida, fonte, relacionamento, findings, oportunidades, contexto e hotspots de manutenção.
-
-Dependências, uso, complexidade e centralidade chegam pré-resolvidos; um consumidor downstream não precisa reparsear DAX para responder perguntas básicas sobre o modelo.
-
-## Privacidade e segurança
-
-- a análise é local e read-only;
-- o HTML não depende de CDN ou rede para abrir;
-- a execução não acessa o registry npm;
-- caminhos absolutos da estação não são persistidos no `profile.json` por padrão;
-- nenhum PBIP ou dado corporativo é necessário no repositório do `pbi-profiling`;
-- texto originado do PBIP é escapado antes de ser incorporado ao HTML;
-- contexto de negócio é carregado localmente e tratado como entrada explícita, nunca inferida;
-- configuração heurística local é reportada como configuração, nunca apresentada como fato extraído.
-
-## Desenvolvimento
-
-Os mesmos gates usados pelo runtime podem ser executados sem package manager:
-
-```powershell
-node .\scripts\check.js
-node .\scripts\test.js
-```
-
-O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes, smoke test do CLI e parsing do launcher PBIX no Windows PowerShell 5.1.
-
-Os gates públicos usam somente fixtures sintéticas/open source; artefatos corporativos não são versionados neste repositório.
+Licenças e atribuições de terceiros permanecem aplicáveis ao material upstream incluído.
