@@ -301,6 +301,7 @@ async function handleRequest(
         upload.root,
         {
           keepWorkspace: false,
+          projectNameOverride: upload.label,
         },
         enqueue,
       );
@@ -603,6 +604,8 @@ function scheduleJob(
           desktopTimeoutMs:
             options.desktopTimeoutMs ??
             300_000,
+          projectNameOverride:
+            options.projectNameOverride ?? null,
           onProgress(event) {
             job.message = event.message;
             job.events.push({
