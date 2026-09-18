@@ -68,6 +68,15 @@ export async function convertPbixToPbip(
     );
   }
 
+  if (
+    !Number.isInteger(result.tmdlFileCount) ||
+    result.tmdlFileCount < 1
+  ) {
+    throw new Error(
+      'PBIX conversion completed without a verified TMDL file set.',
+    );
+  }
+
   const projectRoot = resolve(result.projectRoot);
   if (!existsSync(projectRoot)) {
     throw new Error(
