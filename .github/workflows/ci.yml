@@ -62,22 +62,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Parse PBIX adapter with Windows PowerShell
+      - name: Parse Windows adapters with Windows PowerShell
         shell: powershell
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path '.\scripts\windows\convert-pbix.ps1'),
-            [ref]$tokens,
-            [ref]$errors
-          ) | Out-Null
+          $scripts = @(
+            '.\scripts\windows\convert-pbix.ps1',
+            '.\scripts\windows\select-powerbi-target.ps1'
+          )
 
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object {
-              Write-Error $_.Message
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object {
+                Write-Error "${script}: $($_.Message)"
+              }
+              exit 1
             }
-            exit 1
-          }
 
-          Write-Host 'Windows PowerShell syntax OK'
+            Write-Host "Windows PowerShell syntax OK: $script"
+          }

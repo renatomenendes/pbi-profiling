@@ -38,6 +38,18 @@ test('local app is loopback-only, token-protected and profiles a PBIP path end-t
       html,
       /Gerar runbook/,
     );
+    assert.match(
+      html,
+      /Selecionar PBIX/,
+    );
+    assert.match(
+      html,
+      /Selecionar \.pbip/,
+    );
+    assert.match(
+      html,
+      /Selecionar pasta/,
+    );
 
     const unauthorized = await fetch(
       `${origin}/api/jobs/path`,
@@ -217,6 +229,69 @@ test('local app creates PBIX upload workspace before streaming files with realis
       job.message,
       /PBIX intake requires Windows/i,
     );
+  } finally {
+    await app.close();
+  }
+});
+
+
+test('native picker endpoint is token-protected and reports platform availability explicitly', async () => {
+  const app = await startLocalApp({
+    open: false,
+  });
+
+  try {
+    const url = new URL(app.url);
+
+    const unauthorized = await fetch(
+      `${url.origin}/api/picker`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          kind: 'folder',
+        }),
+      },
+    );
+
+    assert.equal(
+      unauthorized.status,
+      403,
+    );
+
+    const response = await fetch(
+      `${url.origin}/api/picker`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-pbi-profiling-token': app.token,
+        },
+        body: JSON.stringify({
+          kind: 'folder',
+        }),
+      },
+    );
+
+    if (process.platform === 'win32') {
+      assert.notEqual(
+        response.status,
+        403,
+      );
+    } else {
+      assert.equal(
+        response.status,
+        501,
+      );
+
+      const payload = await response.json();
+      assert.match(
+        payload.error,
+        /available only on Windows/i,
+      );
+    }
   } finally {
     await app.close();
   }
