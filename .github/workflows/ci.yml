@@ -66,8 +66,7 @@ jobs:
         shell: powershell
         run: |
           $scripts = @(
-            '.\scripts\windows\convert-pbix.ps1',
-            '.\scripts\windows\select-powerbi-target.ps1'
+            '.\scripts\windows\convert-pbix.ps1'
           )
 
           foreach ($script in $scripts) {
