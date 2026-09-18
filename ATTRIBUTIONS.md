@@ -47,11 +47,11 @@ Both local files carry provenance headers. No parser, HTML generator or lineage 
 ### Horizun PBI MCP
 
 - Repository: https://github.com/HorizunGroup/horizun-pbi-mcp
-- Evaluated architecture: `pbip/pbix_to_pbip.py`, `pbip/pbix_reader.py`, `powerbi/tmdl_export.py`, and Power BI Desktop workspace discovery.
+- Evaluated architecture: PBIX report extraction, Power BI Desktop discovery and TMDL export.
 - License: Apache-2.0.
-- Useful reference: split PBIX conversion into report extraction plus official TMDL serialization from the local Analysis Services model exposed by Power BI Desktop.
+- Status: architectural research only; no runtime dependency and no current PBIX-to-PBIP conversion path.
 
-The local implementation in `scripts/windows/convert-pbix.ps1` is an original PowerShell/Node implementation designed for the repository's zero-install constraint. It does not copy the Python implementation. The architectural decision to avoid decoding the compressed `DataModel` directly and instead use Microsoft's `TmdlSerializer` was validated against this project and is explicitly attributed here.
+An experimental local PBIX-to-PBIP adapter was developed during evaluation, but it was removed from the production workflow after real-world validation showed that programmatic conversion added unnecessary fragility compared with the Power BI Desktop Save As workflow. The current product uses PBIX only as an optional Desktop-launch convenience and profiles PBIP saved by Power BI Desktop.
 
 ### PBI Inspector
 
