@@ -16,9 +16,6 @@ export {
   startLocalApp,
 } from './app/server.js';
 export {
-  selectLocalPowerBiTarget,
-} from './app/picker.js';
-export {
   buildProfile,
   PROFILE_SCHEMA_VERSION,
 } from './profile/build.js';
