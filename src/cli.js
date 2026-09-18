@@ -1,29 +1,32 @@
 #!/usr/bin/env node
 
-import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { loadProfilingConfig } from './config/load.js';
-import { loadBusinessContext } from './context/load.js';
-import { analyzeProject } from './engine/analyze.js';
-import {
-  writeJsonAtomic,
-  writeTextAtomic,
-} from './export/files.js';
-import { renderExtendedRagJsonl } from './export/rag-extended.js';
-import { buildProfile } from './profile/build.js';
-import { renderEnhancedReportHtml } from './report/enhance.js';
-import { renderLineageHtml } from './report/lineage.js';
+import { profileTarget } from './application/profile.js';
+import { buildCliSummary } from './application/summary.js';
 
 const USAGE = `
-pbi-profiling profile <pbip-directory> --output <directory> [--context <file>] [--config <file>]
+pbi-profiling profile <power-bi-target> --output <directory> [options]
 
-Build a read-only, self-contained profile of a Power BI PBIP project.
+Accepted targets:
+  <project-folder>      PBIP project folder.
+  <file.pbip>           PBIP project index file.
+  <folder.SemanticModel> or <folder.Report>
+  <file.pbix>           Windows only. Uses the already-installed Power BI
+                        Desktop engine to materialize a temporary PBIP/TMDL
+                        project before profiling.
 
 Runtime requirements:
   Node.js 20+ and the repository cloned with its Git submodule.
   No npm install is required for profiling execution.
+
+PBIX requirements:
+  Windows + an existing Power BI Desktop installation.
+  No Python, package installation, elevation or ExecutionPolicy change is used.
+  Current direct intake requires PBIX files with embedded PBIR report
+  definitions. Legacy Report/Layout PBIX files fail explicitly rather than
+  being approximated.
 
 Outputs:
   profile.html       Human-oriented offline runbook.
@@ -31,24 +34,32 @@ Outputs:
   profile.rag.jsonl  Retrieval-ready chunks for AI/RAG workflows.
 
 Optional business context:
-  If --context is omitted, pbi-profiling looks for
-  <pbip-directory>/pbi-profiling.context.json. Absence is valid and never
-  causes business meaning to be fabricated.
+  If --context is omitted, pbi-profiling looks next to the original target for
+  pbi-profiling.context.json. Absence is valid.
 
 Optional profiling configuration:
-  If --config is omitted, pbi-profiling looks for
-  <pbip-directory>/pbi-profiling.config.json. Absence is valid. The default
-  analytical semantics remain domain-neutral and deterministic.
+  If --config is omitted, pbi-profiling looks next to the original target for
+  pbi-profiling.config.json. Absence is valid.
 
 Options:
-  -o, --output <directory>  Required output directory.
-  -c, --context <file>      Optional business-context sidecar.
-  -g, --config <file>       Optional profiling/semantic configuration.
-  -h, --help                Show this help.
+  -o, --output <directory>       Required output directory.
+  -c, --context <file>           Optional business-context sidecar.
+  -g, --config <file>            Optional profiling/semantic configuration.
+      --keep-workspace           Preserve temporary PBIP created from PBIX.
+      --desktop-timeout <sec>    Wait limit for PBIX model loading. Default 300.
+  -h, --help                     Show this help.
+
+Local UI:
+  node .\\src\\app.js
 `.trim();
 
-export async function runCli(args = process.argv.slice(2)) {
-  const { values, positionals } = parseArgs({
+export async function runCli(
+  args = process.argv.slice(2),
+) {
+  const {
+    values,
+    positionals,
+  } = parseArgs({
     args,
     allowPositionals: true,
     strict: true,
@@ -65,6 +76,13 @@ export async function runCli(args = process.argv.slice(2)) {
         type: 'string',
         short: 'g',
       },
+      'keep-workspace': {
+        type: 'boolean',
+        default: false,
+      },
+      'desktop-timeout': {
+        type: 'string',
+      },
       help: {
         type: 'boolean',
         short: 'h',
@@ -74,13 +92,21 @@ export async function runCli(args = process.argv.slice(2)) {
   });
 
   if (values.help) {
-    process.stdout.write(`${USAGE}\n`);
+    process.stdout.write(
+      `${USAGE}\n`,
+    );
     return 0;
   }
 
-  const [command, target] = positionals;
+  const [
+    command,
+    target,
+  ] = positionals;
 
-  if (command !== 'profile' || !target) {
+  if (
+    command !== 'profile' ||
+    !target
+  ) {
     throw new Error(
       `Invalid command.\n\n${USAGE}`,
     );
@@ -92,83 +118,30 @@ export async function runCli(args = process.argv.slice(2)) {
     );
   }
 
-  const result = analyzeProject(target);
-  const businessContext = loadBusinessContext(
-    result.targetPath,
-    values.context ?? null,
-  );
-  const profilingConfig = loadProfilingConfig(
-    result.targetPath,
-    values.config ?? null,
-  );
-  const profile = buildProfile(result, {
-    businessContext,
-    profilingConfig,
-  });
-  const lineageHtml = renderLineageHtml(profile);
-  const reportHtml = renderEnhancedReportHtml({
-    profile,
-    lineageHtml,
-  });
-  const ragJsonl = renderExtendedRagJsonl(profile);
-  const outputDirectory = resolve(values.output);
-  const jsonFile = writeJsonAtomic(
-    resolve(outputDirectory, 'profile.json'),
-    profile,
-  );
-  const htmlFile = writeTextAtomic(
-    resolve(outputDirectory, 'profile.html'),
-    reportHtml,
-  );
-  const ragFile = writeTextAtomic(
-    resolve(outputDirectory, 'profile.rag.jsonl'),
-    ragJsonl,
+  const desktopTimeoutSeconds =
+    parsePositiveNumber(
+      values['desktop-timeout'],
+      300,
+    );
+
+  const result = await profileTarget(
+    target,
+    {
+      outputDirectory: values.output,
+      contextPath:
+        values.context ?? null,
+      configPath:
+        values.config ?? null,
+      keepWorkspace:
+        values['keep-workspace'],
+      desktopTimeoutMs:
+        desktopTimeoutSeconds * 1000,
+    },
   );
 
   process.stdout.write(
     `${JSON.stringify(
-      {
-        project: profile.meta.projectName,
-        model: profile.meta.modelName,
-        report: profile.meta.reportName,
-        outputs: {
-          html: htmlFile,
-          json: jsonFile,
-          rag: ragFile,
-        },
-        counts: profile.overview.counts,
-        health: profile.health.counts,
-        sourceResolution: {
-          physicalColumnCoverage:
-            profile.sourceResolution.summary.physicalColumnCoverage,
-          resourceLineageCoverage:
-            profile.sourceResolution.summary.resourceLineageCoverage,
-          physicalColumnResolved:
-            profile.sourceResolution.summary.physicalColumnResolved,
-          resourceResolved:
-            profile.sourceResolution.summary.resourceResolved,
-          inlineColumns:
-            profile.sourceResolution.summary.inlineColumns,
-          unresolvedColumns:
-            profile.sourceResolution.summary.unresolvedColumns,
-          computedColumns:
-            profile.sourceResolution.summary.computedColumns,
-        },
-        complexity: profile.complexity.combined,
-        maintenance: profile.maintenance.summary,
-        context: {
-          status: profile.context.status,
-          source: profile.context.source,
-          warnings: profile.context.warnings.length,
-        },
-        analyticalSemantics:
-          profile.analytical.methodology.semanticConfiguration,
-        analyticalOpportunities:
-          profile.analytical.opportunities.filter(
-            (item) => item.status !== 'insufficient-structural-evidence',
-          ).length,
-        lineageWarnings: [],
-      },
+      buildCliSummary(result),
       null,
       2,
     )}\n`,
@@ -177,16 +150,46 @@ export async function runCli(args = process.argv.slice(2)) {
   return 0;
 }
 
+function parsePositiveNumber(
+  value,
+  fallback,
+) {
+  if (value == null) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  if (
+    !Number.isFinite(parsed) ||
+    parsed <= 0
+  ) {
+    throw new Error(
+      `Expected a positive number, received: ${value}`,
+    );
+  }
+
+  return parsed;
+}
+
 const isMainModule =
   Boolean(process.argv[1]) &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
+  import.meta.url ===
+    pathToFileURL(process.argv[1]).href;
 
 if (isMainModule) {
   try {
-    process.exitCode = await runCli();
+    process.exitCode =
+      await runCli();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`pbi-profiling: ${message}\n`);
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    process.stderr.write(
+      `pbi-profiling: ${message}\n`,
+    );
     process.exitCode = 1;
   }
 }
