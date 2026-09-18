@@ -1,5 +1,5 @@
 export function renderAppPage() {
-  return `<!doctype html>
+  return String.raw`<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
@@ -29,9 +29,7 @@ export function renderAppPage() {
       padding: 46px 0 64px;
     }
 
-    .hero {
-      margin-bottom: 24px;
-    }
+    .hero { margin-bottom: 24px; }
 
     .eyebrow {
       color: #526078;
@@ -49,7 +47,7 @@ export function renderAppPage() {
     }
 
     .hero p {
-      max-width: 760px;
+      max-width: 780px;
       margin: 0;
       color: #5d687b;
       font-size: 17px;
@@ -90,8 +88,7 @@ export function renderAppPage() {
     }
 
     input[type="text"],
-    input[type="number"],
-    input[type="file"] {
+    input[type="number"] {
       width: 100%;
       min-height: 44px;
       padding: 10px 12px;
@@ -102,9 +99,7 @@ export function renderAppPage() {
       font: inherit;
     }
 
-    .field {
-      margin-top: 14px;
-    }
+    .field { margin-top: 14px; }
 
     .inline {
       display: flex;
@@ -142,7 +137,7 @@ export function renderAppPage() {
     }
 
     button:disabled {
-      opacity: .5;
+      opacity: .45;
       cursor: not-allowed;
     }
 
@@ -153,8 +148,57 @@ export function renderAppPage() {
       margin-top: 18px;
     }
 
-    .status {
+    .selection {
+      min-height: 68px;
       margin-top: 16px;
+      padding: 12px 14px;
+      border: 1px dashed #cbd3df;
+      border-radius: 12px;
+      color: #667286;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .selection strong {
+      display: block;
+      margin-bottom: 3px;
+      color: #344158;
+    }
+
+    .selection.ready {
+      border-style: solid;
+      border-color: #b8dfc7;
+      background: #eff9f3;
+      color: #356246;
+    }
+
+    .selection.error {
+      border-style: solid;
+      border-color: #f0c1bd;
+      background: #fff2f1;
+      color: #8e3832;
+    }
+
+    details.advanced {
+      margin-top: 16px;
+    }
+
+    details.advanced summary {
+      cursor: pointer;
+      color: #56637a;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .privacy {
+      margin-top: 16px;
+      padding: 14px 16px;
+      color: #4d5a70;
+      background: #edf2ff;
+      border: 1px solid #d8e1ff;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
     }
 
     .status-card {
@@ -162,9 +206,7 @@ export function renderAppPage() {
       margin-top: 16px;
     }
 
-    .status-card.visible {
-      display: block;
-    }
+    .status-card.visible { display: block; }
 
     .status-line {
       display: flex;
@@ -173,9 +215,7 @@ export function renderAppPage() {
       gap: 12px;
     }
 
-    .status-line strong {
-      font-size: 18px;
-    }
+    .status-line strong { font-size: 18px; }
 
     .pill {
       display: inline-flex;
@@ -248,17 +288,6 @@ export function renderAppPage() {
       font-size: 13px;
     }
 
-    .privacy {
-      margin-top: 16px;
-      padding: 14px 16px;
-      color: #4d5a70;
-      background: #edf2ff;
-      border: 1px solid #d8e1ff;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
     .muted {
       color: #778196;
       font-size: 12px;
@@ -266,7 +295,10 @@ export function renderAppPage() {
 
     @media (max-width: 780px) {
       .grid { grid-template-columns: 1fr; }
-      main { width: min(100% - 20px, 1080px); padding-top: 26px; }
+      main {
+        width: min(100% - 20px, 1080px);
+        padding-top: 26px;
+      }
     }
 
     @media (prefers-color-scheme: dark) {
@@ -295,13 +327,13 @@ export function renderAppPage() {
       }
 
       .eyebrow,
-      label {
+      label,
+      details.advanced summary {
         color: #b5c0d2;
       }
 
       input[type="text"],
-      input[type="number"],
-      input[type="file"] {
+      input[type="number"] {
         color: #edf2fb;
         background: #111722;
         border-color: #3a465a;
@@ -320,9 +352,26 @@ export function renderAppPage() {
         border-color: #283959;
       }
 
-      .events li {
-        border-color: #293241;
+      .selection {
+        color: #a5b0c2;
+        border-color: #3b4658;
       }
+
+      .selection strong { color: #dbe4f2; }
+
+      .selection.ready {
+        color: #a8d8b9;
+        background: #15271d;
+        border-color: #2f6243;
+      }
+
+      .selection.error {
+        color: #f0aaa5;
+        background: #301a1a;
+        border-color: #75413e;
+      }
+
+      .events li { border-color: #293241; }
     }
   </style>
 </head>
@@ -332,9 +381,9 @@ export function renderAppPage() {
       <div class="eyebrow">Power BI · Universal Intake</div>
       <h1>pbi-profiling</h1>
       <p>
-        Selecione um PBIX, um arquivo PBIP ou uma pasta de projeto. O
-        processamento ocorre localmente, gera um runbook autocontido e não
-        envia artefatos para serviços externos.
+        Escolha um PBIX ou uma pasta PBIP. A seleção ocorre no navegador,
+        o processamento permanece local e o mesmo pipeline produz runbook,
+        perfil estruturado e chunks RAG.
       </p>
     </header>
 
@@ -342,88 +391,105 @@ export function renderAppPage() {
       <section class="card">
         <h2>PBIX</h2>
         <p>
-          Para arquivos PBIX atuais. O relatório é extraído localmente e o
-          modelo é serializado pelo TOM do Power BI Desktop já instalado.
+          Para arquivos Power BI Desktop. O arquivo é copiado por streaming
+          somente para o workspace local, aberto pelo Desktop e serializado
+          para TMDL pelo TOM já instalado.
         </p>
 
-        <div class="field">
-          <label for="pbix-path">Arquivo PBIX</label>
-          <input
-            id="pbix-path"
-            type="text"
-            autocomplete="off"
-            placeholder="Nenhum PBIX selecionado"
-            readonly
-          >
+        <input id="pbix-file" type="file" accept=".pbix" hidden>
+
+        <div id="pbix-selection" class="selection">
+          Nenhum PBIX selecionado.
         </div>
 
         <div class="actions">
-          <button id="pbix-select" class="secondary" type="button">Selecionar PBIX</button>
+          <button id="pbix-select" class="secondary" type="button">
+            Selecionar PBIX
+          </button>
         </div>
 
         <div class="field inline">
           <input id="pbix-keep" type="checkbox">
-          <label for="pbix-keep" style="margin:0">Manter PBIP temporário para inspeção</label>
+          <label for="pbix-keep" style="margin:0">
+            Manter PBIP temporário para inspeção
+          </label>
         </div>
 
         <div class="field">
           <label for="pbix-timeout">Timeout do Desktop (segundos)</label>
-          <input id="pbix-timeout" type="number" min="30" max="1800" value="300">
+          <input
+            id="pbix-timeout"
+            type="number"
+            min="30"
+            max="1800"
+            value="300"
+          >
         </div>
 
         <div class="actions">
-          <button id="pbix-run" type="button">Gerar runbook</button>
+          <button id="pbix-run" type="button" disabled>
+            Gerar runbook
+          </button>
         </div>
       </section>
 
       <section class="card">
         <h2>PBIP / SemanticModel</h2>
         <p>
-          Para projetos já descompactados. Aceita a pasta do projeto, um
-          arquivo .pbip ou uma pasta .SemanticModel/.Report.
+          Selecione a pasta do projeto. O navegador lê somente TMDL, PBIR,
+          JSON e .platform relevantes; caches, .pbi, imagens e diretórios
+          de desenvolvimento são ignorados.
         </p>
 
-        <div class="field">
-          <label for="project-path">Caminho local</label>
-          <input
-            id="project-path"
-            type="text"
-            autocomplete="off"
-            placeholder="C:\projetos\MeuPainel"
-          >
+        <input
+          id="project-folder-fallback"
+          type="file"
+          webkitdirectory
+          directory
+          multiple
+          hidden
+        >
+
+        <div id="project-selection" class="selection">
+          Nenhum projeto selecionado.
         </div>
 
         <div class="actions">
-          <button id="project-select-file" class="secondary" type="button">Selecionar .pbip</button>
-          <button id="project-select-folder" class="secondary" type="button">Selecionar pasta</button>
-          <button id="path-run" type="button">Analisar projeto</button>
+          <button id="project-select" class="secondary" type="button">
+            Selecionar pasta do projeto
+          </button>
+          <button id="project-run" type="button" disabled>
+            Gerar runbook
+          </button>
         </div>
 
-        <p class="muted" style="margin-top:16px">
-          No Windows, os botões abrem o seletor nativo do sistema. O caminho
-          também pode ser digitado diretamente quando necessário.
-        </p>
+        <details class="advanced">
+          <summary>Modo avançado: analisar um caminho local</summary>
+
+          <div class="field">
+            <label for="manual-path">Caminho local</label>
+            <input
+              id="manual-path"
+              type="text"
+              autocomplete="off"
+              placeholder="C:\projetos\MeuPainel"
+            >
+          </div>
+
+          <div class="actions">
+            <button id="manual-run" class="secondary" type="button">
+              Analisar caminho
+            </button>
+          </div>
+        </details>
       </section>
     </div>
 
     <div class="privacy">
-      O servidor escuta somente em <strong>127.0.0.1</strong>. A seleção de
-      arquivos e pastas usa o próprio Windows; o pipeline trabalha diretamente
-      com o caminho local. Nenhuma CDN, telemetria ou chamada externa de rede é
-      usada pelo frontend.
+      O servidor escuta somente em <strong>127.0.0.1</strong>. A UI não usa
+      PowerShell para escolher arquivos, não usa CDN e não envia artefatos para
+      serviços externos. PowerShell permanece restrito ao adapter PBIX/TOM.
     </div>
-
-    <dialog id="project-choice">
-      <form method="dialog" class="card" style="min-width:min(440px,90vw)">
-        <h2>Selecionar projeto</h2>
-        <p>Escolha o tipo de entrada que deseja analisar.</p>
-        <div class="actions">
-          <button id="dialog-select-pbip" type="button">Arquivo .pbip</button>
-          <button id="dialog-select-folder" type="button">Pasta do projeto</button>
-          <button class="secondary" value="cancel">Cancelar</button>
-        </div>
-      </form>
-    </dialog>
 
     <section id="status-card" class="card status-card">
       <div class="status-line">
@@ -434,7 +500,9 @@ export function renderAppPage() {
       <p id="status-message">Aguardando início.</p>
       <ul id="events" class="events"></ul>
       <div id="result-actions" class="actions" hidden>
-        <a id="open-runbook" class="button" target="_blank" rel="noopener">Abrir runbook</a>
+        <a id="open-runbook" class="button" target="_blank" rel="noopener">
+          Abrir runbook
+        </a>
         <a id="download-json" class="button secondary">profile.json</a>
         <a id="download-rag" class="button secondary">profile.rag.jsonl</a>
       </div>
@@ -444,8 +512,32 @@ export function renderAppPage() {
 
   <script>
     const token = new URLSearchParams(location.search).get('token');
+    const RELEVANT_EXTENSIONS = new Set([
+      '.tmdl',
+      '.json',
+      '.pbir',
+      '.platform',
+    ]);
+    const SKIP_DIRECTORIES = new Set([
+      '.git',
+      'node_modules',
+      '.vscode',
+      '.idea',
+      '.pbi',
+      'cache',
+    ]);
 
     const elements = {
+      pbixFile: document.getElementById('pbix-file'),
+      pbixSelection: document.getElementById('pbix-selection'),
+      pbixSelect: document.getElementById('pbix-select'),
+      pbixRun: document.getElementById('pbix-run'),
+      projectFolderFallback: document.getElementById('project-folder-fallback'),
+      projectSelection: document.getElementById('project-selection'),
+      projectSelect: document.getElementById('project-select'),
+      projectRun: document.getElementById('project-run'),
+      manualPath: document.getElementById('manual-path'),
+      manualRun: document.getElementById('manual-run'),
       statusCard: document.getElementById('status-card'),
       statusTitle: document.getElementById('status-title'),
       statusPill: document.getElementById('status-pill'),
@@ -457,71 +549,530 @@ export function renderAppPage() {
       downloadJson: document.getElementById('download-json'),
       downloadRag: document.getElementById('download-rag'),
       workspaceNote: document.getElementById('workspace-note'),
-      pbixRun: document.getElementById('pbix-run'),
-      pbixSelect: document.getElementById('pbix-select'),
-      pathRun: document.getElementById('path-run'),
-      projectSelectFile: document.getElementById('project-select-file'),
-      projectSelectFolder: document.getElementById('project-select-folder'),
-      projectChoice: document.getElementById('project-choice'),
-      dialogSelectPbip: document.getElementById('dialog-select-pbip'),
-      dialogSelectFolder: document.getElementById('dialog-select-folder'),
     };
 
+    let selectedPbix = null;
+    let selectedProject = null;
     let polling = null;
+    let busy = false;
 
-    function apiHeaders(extra = {}) {
-      return {
-        'x-pbi-profiling-token': token || '',
-        ...extra,
-      };
+    function apiHeaders(extra) {
+      return Object.assign(
+        {
+          'x-pbi-profiling-token': token || '',
+        },
+        extra || {},
+      );
     }
 
-    function setBusy(busy) {
-      elements.pbixRun.disabled = busy;
+    function setBusy(value) {
+      busy = Boolean(value);
       elements.pbixSelect.disabled = busy;
-      elements.pathRun.disabled = busy;
-      elements.projectSelectFile.disabled = busy;
-      elements.projectSelectFolder.disabled = busy;
+      elements.projectSelect.disabled = busy;
+      elements.manualRun.disabled = busy;
+      elements.pbixRun.disabled = busy || !selectedPbix;
+      elements.projectRun.disabled = busy || !selectedProject;
     }
 
-    function showStatus() {
+    function showStatus(title, message) {
       elements.statusCard.classList.add('visible');
       elements.resultActions.hidden = true;
       elements.workspaceNote.hidden = true;
+      elements.statusTitle.textContent = title || 'Processando';
+      elements.statusPill.textContent = 'running';
+      elements.statusPill.className = 'pill';
+      elements.statusMessage.textContent = message || 'Processando.';
       elements.progress.className = 'progress';
       elements.events.replaceChildren();
     }
 
-    async function startPbix() {
-      let path = document.getElementById('pbix-path').value.trim();
+    function renderClientError(error) {
+      elements.statusCard.classList.add('visible');
+      elements.resultActions.hidden = true;
+      elements.workspaceNote.hidden = true;
+      elements.statusTitle.textContent = 'Falha';
+      elements.statusPill.textContent = 'failed';
+      elements.statusPill.className = 'pill error';
+      elements.statusMessage.textContent =
+        error && error.message
+          ? error.message
+          : String(error);
+      elements.progress.className = 'progress error';
+      setBusy(false);
+    }
 
-      if (!path) {
-        path = await pickTarget('pbix', 'pbix-path');
-        if (!path) {
-          return;
+    function formatBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (value < 1024) return value + ' B';
+      if (value < 1024 * 1024) return (value / 1024).toFixed(1) + ' KB';
+      if (value < 1024 * 1024 * 1024) {
+        return (value / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+      return (value / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function normalizeBrowserPath(value) {
+      return String(value || '')
+        .replaceAll('\\', '/')
+        .replace(/^\.\//, '')
+        .replace(/^\/+/, '');
+    }
+
+    function pathParts(value) {
+      return normalizeBrowserPath(value)
+        .split('/')
+        .filter(Boolean);
+    }
+
+    function shouldDescend(path) {
+      return !pathParts(path).some(
+        function(part) {
+          return SKIP_DIRECTORIES.has(part.toLowerCase());
+        },
+      );
+    }
+
+    function shouldReadProjectFile(path) {
+      const normalized = normalizeBrowserPath(path);
+      const parts = pathParts(normalized);
+
+      if (
+        parts.some(
+          function(part) {
+            return SKIP_DIRECTORIES.has(part.toLowerCase());
+          },
+        )
+      ) {
+        return false;
+      }
+
+      const name = parts[parts.length - 1] || '';
+      const dot = name.lastIndexOf('.');
+      const extension =
+        dot >= 0
+          ? name.slice(dot).toLowerCase()
+          : '';
+
+      return RELEVANT_EXTENSIONS.has(extension);
+    }
+
+    async function readDirectoryHandle(handle) {
+      const files = [];
+
+      async function walk(directory, prefix) {
+        for await (const entry of directory.values()) {
+          const path =
+            prefix
+              ? prefix + '/' + entry.name
+              : entry.name;
+
+          if (entry.kind === 'directory') {
+            if (shouldDescend(path)) {
+              await walk(entry, path);
+            }
+            continue;
+          }
+
+          if (!shouldReadProjectFile(path)) {
+            continue;
+          }
+
+          files.push({
+            path: normalizeBrowserPath(path),
+            file: await entry.getFile(),
+          });
         }
       }
 
-      const keepWorkspace = document.getElementById('pbix-keep').checked;
-      const timeout = Number(document.getElementById('pbix-timeout').value || 300);
+      await walk(handle, '');
 
-      setBusy(true);
-      showStatus();
-      elements.statusTitle.textContent = 'Preparando PBIX';
-      elements.statusMessage.textContent = 'Abrindo o PBIX diretamente do caminho local selecionado.';
+      return {
+        name: handle.name || 'Power BI project',
+        files: files,
+      };
+    }
 
-      try {
-        const response = await fetch('/api/jobs/path', {
+    function readFileList(fileList) {
+      const files = [];
+      let rootName = '';
+
+      for (const file of fileList || []) {
+        const raw = normalizeBrowserPath(
+          file.webkitRelativePath || file.name,
+        );
+        const parts = pathParts(raw);
+
+        if (!rootName && parts.length > 1) {
+          rootName = parts[0];
+        }
+
+        const relative =
+          parts.length > 1
+            ? parts.slice(1).join('/')
+            : parts.join('/');
+
+        if (!shouldReadProjectFile(relative)) {
+          continue;
+        }
+
+        files.push({
+          path: relative,
+          file: file,
+        });
+      }
+
+      return {
+        name: rootName || 'Power BI project',
+        files: files,
+      };
+    }
+
+    function promptForDirectoryFallback() {
+      return new Promise(
+        function(resolve) {
+          const input = elements.projectFolderFallback;
+          input.value = '';
+
+          let settled = false;
+
+          function finish(value) {
+            if (settled) return;
+            settled = true;
+            input.removeEventListener('change', onChange);
+            input.removeEventListener('cancel', onCancel);
+            resolve(value);
+          }
+
+          function onChange() {
+            if (!input.files || input.files.length === 0) {
+              finish(null);
+              return;
+            }
+            finish(readFileList(input.files));
+          }
+
+          function onCancel() {
+            finish(null);
+          }
+
+          input.addEventListener('change', onChange);
+          input.addEventListener('cancel', onCancel);
+
+          window.addEventListener(
+            'focus',
+            function() {
+              setTimeout(
+                function() {
+                  if (
+                    !settled &&
+                    (!input.files || input.files.length === 0)
+                  ) {
+                    finish(null);
+                  }
+                },
+                500,
+              );
+            },
+            { once: true },
+          );
+
+          input.click();
+        },
+      );
+    }
+
+    async function pickProjectFolder() {
+      if (
+        typeof window.showDirectoryPicker === 'function'
+      ) {
+        try {
+          const handle =
+            await window.showDirectoryPicker({
+              id: 'pbi-profiling-pbip',
+              mode: 'read',
+            });
+
+          return await readDirectoryHandle(handle);
+        } catch (error) {
+          if (
+            error &&
+            error.name === 'AbortError'
+          ) {
+            return null;
+          }
+          throw error;
+        }
+      }
+
+      return await promptForDirectoryFallback();
+    }
+
+    async function readResponse(response) {
+      const text = await response.text();
+      let payload = {};
+
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          throw new Error(
+            'O servidor local retornou uma resposta inválida.',
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ||
+          'Falha na solicitação local.',
+        );
+      }
+
+      return payload;
+    }
+
+    async function uploadProjectFiles(projectId, files) {
+      let next = 0;
+      let completed = 0;
+      const workers = Math.min(4, files.length);
+
+      async function worker() {
+        while (true) {
+          const index = next;
+          next += 1;
+
+          if (index >= files.length) {
+            return;
+          }
+
+          const item = files[index];
+
+          const response = await fetch(
+            '/api/projects/' +
+              encodeURIComponent(projectId) +
+              '/files?path=' +
+              encodeURIComponent(item.path),
+            {
+              method: 'PUT',
+              headers: apiHeaders({
+                'content-type':
+                  'application/octet-stream',
+              }),
+              body: item.file,
+            },
+          );
+
+          await readResponse(response);
+
+          completed += 1;
+          elements.projectSelection.innerHTML =
+            '<strong>Preparando projeto</strong>' +
+            'Enviando arquivos relevantes: ' +
+            completed +
+            ' / ' +
+            files.length;
+        }
+      }
+
+      const running = [];
+      for (let index = 0; index < workers; index += 1) {
+        running.push(worker());
+      }
+
+      await Promise.all(running);
+    }
+
+    async function stageSelectedProject(selection) {
+      if (
+        !selection ||
+        !selection.files ||
+        selection.files.length === 0
+      ) {
+        throw new Error(
+          'A pasta selecionada não contém artefatos PBIP/TMDL/PBIR relevantes.',
+        );
+      }
+
+      elements.projectSelection.className = 'selection';
+      elements.projectSelection.innerHTML =
+        '<strong>Preparando projeto</strong>' +
+        selection.files.length +
+        ' arquivos relevantes encontrados.';
+
+      const create = await fetch(
+        '/api/projects',
+        {
           method: 'POST',
           headers: apiHeaders({
             'content-type': 'application/json',
           }),
           body: JSON.stringify({
-            path,
-            keepWorkspace,
-            desktopTimeoutSeconds: timeout,
+            name: selection.name,
           }),
-        });
+        },
+      );
+
+      const created = await readResponse(create);
+
+      await uploadProjectFiles(
+        created.projectId,
+        selection.files,
+      );
+
+      const validationResponse = await fetch(
+        '/api/projects/' +
+          encodeURIComponent(created.projectId) +
+          '/validate',
+        {
+          method: 'POST',
+          headers: apiHeaders(),
+        },
+      );
+
+      const validation =
+        await readResponse(validationResponse);
+
+      selectedProject = {
+        id: created.projectId,
+        name: selection.name,
+        validation: validation,
+      };
+
+      const model =
+        validation.modelName || 'modelo detectado';
+      const report =
+        validation.reportName || 'sem relatório PBIR';
+      const note =
+        validation.note
+          ? '<br><span class="muted">' +
+            escapeHtml(validation.note) +
+            '</span>'
+          : '';
+
+      elements.projectSelection.className =
+        'selection ready';
+      elements.projectSelection.innerHTML =
+        '<strong>Projeto pronto para análise</strong>' +
+        escapeHtml(selection.name) +
+        '<br>Modelo: ' +
+        escapeHtml(model) +
+        '<br>Relatório: ' +
+        escapeHtml(report) +
+        '<br>' +
+        validation.fileCount +
+        ' arquivos · ' +
+        formatBytes(validation.totalBytes) +
+        note;
+
+      setBusy(false);
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    async function selectProject() {
+      if (busy) return;
+
+      try {
+        const selection = await pickProjectFolder();
+        if (!selection) {
+          return;
+        }
+
+        selectedProject = null;
+        setBusy(true);
+        await stageSelectedProject(selection);
+      } catch (error) {
+        selectedProject = null;
+        elements.projectSelection.className =
+          'selection error';
+        elements.projectSelection.innerHTML =
+          '<strong>Projeto não pôde ser preparado</strong>' +
+          escapeHtml(
+            error && error.message
+              ? error.message
+              : String(error),
+          );
+        setBusy(false);
+      }
+    }
+
+    function selectPbix() {
+      if (busy) return;
+      elements.pbixFile.value = '';
+      elements.pbixFile.click();
+    }
+
+    function onPbixChanged() {
+      const file =
+        elements.pbixFile.files &&
+        elements.pbixFile.files[0];
+
+      selectedPbix = file || null;
+
+      if (!selectedPbix) {
+        elements.pbixSelection.className =
+          'selection';
+        elements.pbixSelection.textContent =
+          'Nenhum PBIX selecionado.';
+        setBusy(false);
+        return;
+      }
+
+      elements.pbixSelection.className =
+        'selection ready';
+      elements.pbixSelection.innerHTML =
+        '<strong>PBIX selecionado</strong>' +
+        escapeHtml(selectedPbix.name) +
+        '<br>' +
+        formatBytes(selectedPbix.size);
+
+      setBusy(false);
+    }
+
+    async function startPbix() {
+      if (!selectedPbix || busy) {
+        return;
+      }
+
+      const keepWorkspace =
+        document.getElementById('pbix-keep').checked;
+      const timeout = Number(
+        document.getElementById('pbix-timeout').value ||
+        300,
+      );
+
+      setBusy(true);
+      showStatus(
+        'Preparando PBIX',
+        'Copiando o PBIX por streaming para o workspace local.',
+      );
+
+      try {
+        const response = await fetch(
+          '/api/jobs/pbix?keepWorkspace=' +
+            (keepWorkspace ? '1' : '0') +
+            '&timeout=' +
+            encodeURIComponent(timeout),
+          {
+            method: 'POST',
+            headers: apiHeaders({
+              'content-type':
+                'application/octet-stream',
+              'x-file-name':
+                encodeURIComponent(
+                  selectedPbix.name,
+                ),
+            }),
+            body: selectedPbix,
+          },
+        );
 
         const payload = await readResponse(response);
         pollJob(payload.jobId);
@@ -530,25 +1081,27 @@ export function renderAppPage() {
       }
     }
 
-    async function startPath() {
-      const path = document.getElementById('project-path').value.trim();
-
-      if (!path) {
-        elements.projectChoice.showModal();
+    async function startProject() {
+      if (!selectedProject || busy) {
         return;
       }
 
       setBusy(true);
-      showStatus();
+      showStatus(
+        'Processando PBIP',
+        'Executando profiling sobre o projeto validado.',
+      );
 
       try {
-        const response = await fetch('/api/jobs/path', {
-          method: 'POST',
-          headers: apiHeaders({
-            'content-type': 'application/json',
-          }),
-          body: JSON.stringify({ path }),
-        });
+        const response = await fetch(
+          '/api/projects/' +
+            encodeURIComponent(selectedProject.id) +
+            '/profile',
+          {
+            method: 'POST',
+            headers: apiHeaders(),
+          },
+        );
 
         const payload = await readResponse(response);
         pollJob(payload.jobId);
@@ -557,49 +1110,45 @@ export function renderAppPage() {
       }
     }
 
-    async function pickTarget(kind, inputId) {
-      try {
-        const response = await fetch('/api/picker', {
-          method: 'POST',
-          headers: apiHeaders({
-            'content-type': 'application/json',
-          }),
-          body: JSON.stringify({ kind }),
-        });
+    async function startManualPath() {
+      const path = elements.manualPath.value.trim();
 
-        const payload = await readResponse(response);
-
-        if (payload.cancelled || !payload.path) {
-          return '';
+      if (!path || busy) {
+        if (!path) {
+          renderClientError(
+            new Error(
+              'Informe um caminho local antes de analisar.',
+            ),
+          );
         }
-
-        document.getElementById(inputId).value = payload.path;
-        return payload.path;
-      } catch (error) {
-        renderClientError(error);
-        return '';
-      }
-    }
-
-    async function selectProjectAndRun(kind) {
-      const path = await pickTarget(kind, 'project-path');
-      if (!path) {
         return;
       }
 
-      if (elements.projectChoice.open) {
-        elements.projectChoice.close();
-      }
+      setBusy(true);
+      showStatus(
+        'Analisando caminho',
+        'Validando o alvo local informado.',
+      );
 
-      await startPath();
-    }
+      try {
+        const response = await fetch(
+          '/api/jobs/path',
+          {
+            method: 'POST',
+            headers: apiHeaders({
+              'content-type': 'application/json',
+            }),
+            body: JSON.stringify({
+              path: path,
+            }),
+          },
+        );
 
-    async function readResponse(response) {
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Falha na solicitação.');
+        const payload = await readResponse(response);
+        pollJob(payload.jobId);
+      } catch (error) {
+        renderClientError(error);
       }
-      return payload;
     }
 
     function pollJob(jobId) {
@@ -607,15 +1156,23 @@ export function renderAppPage() {
         clearInterval(polling);
       }
 
-      const refresh = async () => {
+      async function refresh() {
         try {
-          const response = await fetch('/api/jobs/' + encodeURIComponent(jobId), {
-            headers: apiHeaders(),
-          });
+          const response = await fetch(
+            '/api/jobs/' +
+              encodeURIComponent(jobId),
+            {
+              headers: apiHeaders(),
+            },
+          );
+
           const job = await readResponse(response);
           renderJob(job);
 
-          if (job.status === 'completed' || job.status === 'failed') {
+          if (
+            job.status === 'completed' ||
+            job.status === 'failed'
+          ) {
             clearInterval(polling);
             polling = null;
             setBusy(false);
@@ -624,9 +1181,8 @@ export function renderAppPage() {
           clearInterval(polling);
           polling = null;
           renderClientError(error);
-          setBusy(false);
         }
-      };
+      }
 
       refresh();
       polling = setInterval(refresh, 1000);
@@ -664,62 +1220,69 @@ export function renderAppPage() {
             : '');
 
       elements.events.replaceChildren(
-        ...(job.events || []).slice(-12).map((event) => {
-          const item = document.createElement('li');
-          item.textContent = event.message;
-          return item;
-        }),
+        ...(job.events || [])
+          .slice(-12)
+          .map(
+            function(event) {
+              const item =
+                document.createElement('li');
+              item.textContent = event.message;
+              return item;
+            },
+          ),
       );
 
       if (job.status === 'completed') {
-        const base = '/api/jobs/' + encodeURIComponent(job.id);
-        const suffix = '?token=' + encodeURIComponent(token || '');
+        const base =
+          '/api/jobs/' +
+          encodeURIComponent(job.id);
+        const suffix =
+          '?token=' +
+          encodeURIComponent(token || '');
 
-        elements.openRunbook.href = base + '/runbook' + suffix;
-        elements.downloadJson.href = base + '/profile' + suffix;
-        elements.downloadRag.href = base + '/rag' + suffix;
+        elements.openRunbook.href =
+          base + '/runbook' + suffix;
+        elements.downloadJson.href =
+          base + '/profile' + suffix;
+        elements.downloadRag.href =
+          base + '/rag' + suffix;
         elements.resultActions.hidden = false;
 
         if (job.workspacePath) {
           elements.workspaceNote.textContent =
-            'PBIP temporário preservado em: ' + job.workspacePath;
+            'PBIP temporário preservado em: ' +
+            job.workspacePath;
           elements.workspaceNote.hidden = false;
         }
       }
     }
 
-    function renderClientError(error) {
-      showStatus();
-      elements.statusTitle.textContent = 'Falha';
-      elements.statusPill.textContent = 'failed';
-      elements.statusPill.className = 'pill error';
-      elements.statusMessage.textContent = error.message || String(error);
-      elements.progress.className = 'progress error';
-      setBusy(false);
-    }
-
     elements.pbixSelect.addEventListener(
       'click',
-      () => pickTarget('pbix', 'pbix-path'),
+      selectPbix,
     );
-    elements.pbixRun.addEventListener('click', startPbix);
-    elements.projectSelectFile.addEventListener(
+    elements.pbixFile.addEventListener(
+      'change',
+      onPbixChanged,
+    );
+    elements.pbixRun.addEventListener(
       'click',
-      () => pickTarget('pbip', 'project-path'),
+      startPbix,
     );
-    elements.projectSelectFolder.addEventListener(
+    elements.projectSelect.addEventListener(
       'click',
-      () => pickTarget('folder', 'project-path'),
+      selectProject,
     );
-    elements.pathRun.addEventListener('click', startPath);
-    elements.dialogSelectPbip.addEventListener(
+    elements.projectRun.addEventListener(
       'click',
-      () => selectProjectAndRun('pbip'),
+      startProject,
     );
-    elements.dialogSelectFolder.addEventListener(
+    elements.manualRun.addEventListener(
       'click',
-      () => selectProjectAndRun('folder'),
+      startManualPath,
     );
+
+    setBusy(false);
   </script>
 </body>
 </html>`;

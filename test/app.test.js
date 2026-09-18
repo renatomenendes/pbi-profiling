@@ -8,9 +8,47 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { startLocalApp } from '../src/app/server.js';
+import { readProjectFolder } from '../src/io/project.js';
 import { writePbipFixture } from './fixtures/pbip.js';
 
-test('local app is loopback-only, token-protected and profiles a PBIP path end-to-end', async () => {
+async function waitForJob(
+  origin,
+  token,
+  jobId,
+  timeoutMs = 10_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let job = null;
+
+  while (Date.now() < deadline) {
+    const response = await fetch(
+      origin + '/api/jobs/' + jobId,
+      {
+        headers: {
+          'x-pbi-profiling-token': token,
+        },
+      },
+    );
+
+    assert.equal(response.status, 200);
+    job = await response.json();
+
+    if (
+      job.status === 'completed' ||
+      job.status === 'failed'
+    ) {
+      return job;
+    }
+
+    await new Promise((resolvePromise) => {
+      setTimeout(resolvePromise, 50);
+    });
+  }
+
+  return job;
+}
+
+test('local app exposes browser-native intake and preserves manual-path profiling', async () => {
   const root = mkdtempSync(
     join(tmpdir(), 'pbi-profiling-app-test-'),
   );
@@ -25,56 +63,81 @@ test('local app is loopback-only, token-protected and profiles a PBIP path end-t
     const url = new URL(app.url);
     const origin = url.origin;
 
-    const page = await fetch(
-      app.url,
-    );
+    const page = await fetch(app.url);
     assert.equal(page.status, 200);
+
     const html = await page.text();
+
+    assert.match(html, /Universal Intake/);
+    assert.match(html, /Selecionar PBIX/);
     assert.match(
       html,
-      /Universal Intake/,
+      /Selecionar pasta do projeto/,
     );
-    assert.match(
+    assert.match(html, /showDirectoryPicker/);
+    assert.match(html, /webkitdirectory/);
+    assert.match(html, /\/api\/jobs\/pbix/);
+    assert.doesNotMatch(html, /\/api\/picker/);
+    assert.doesNotMatch(
       html,
-      /Gerar runbook/,
+      /WinForms|Windows Forms/i,
     );
-    assert.match(
-      html,
-      /Selecionar PBIX/,
-    );
-    assert.match(
-      html,
-      /Selecionar \.pbip/,
-    );
-    assert.match(
-      html,
-      /Selecionar pasta/,
+
+    for (const id of [
+      'pbix-file',
+      'pbix-select',
+      'pbix-run',
+      'project-folder-fallback',
+      'project-select',
+      'project-run',
+      'manual-path',
+      'manual-run',
+      'status-card',
+    ]) {
+      assert.match(
+        html,
+        new RegExp('id="' + id + '"'),
+      );
+    }
+
+    const inlineScript =
+      html.match(
+        /<script>([\s\S]*?)<\/script>/,
+      )?.[1];
+
+    assert.ok(inlineScript);
+    assert.doesNotThrow(
+      () => new Function(inlineScript),
     );
 
     const unauthorized = await fetch(
-      `${origin}/api/jobs/path`,
+      origin + '/api/jobs/path',
       {
         method: 'POST',
         headers: {
-          'content-type': 'application/json',
+          'content-type':
+            'application/json',
         },
         body: JSON.stringify({
           path: project,
         }),
       },
     );
+
     assert.equal(
       unauthorized.status,
       403,
     );
 
     const create = await fetch(
-      `${origin}/api/jobs/path`,
+      origin + '/api/jobs/path',
       {
         method: 'POST',
         headers: {
-          'content-type': 'application/json',
-          'x-pbi-profiling-token': app.token,
+          'content-type':
+            'application/json',
+          'x-pbi-profiling-token':
+            app.token,
         },
         body: JSON.stringify({
           path: project,
@@ -86,35 +149,14 @@ test('local app is loopback-only, token-protected and profiles a PBIP path end-t
       create.status,
       202,
     );
+
     const created = await create.json();
-    assert.ok(created.jobId);
 
-    let job;
-    const deadline = Date.now() + 10_000;
-
-    while (Date.now() < deadline) {
-      const status = await fetch(
-        `${origin}/api/jobs/${created.jobId}`,
-        {
-          headers: {
-            'x-pbi-profiling-token': app.token,
-          },
-        },
-      );
-      assert.equal(status.status, 200);
-      job = await status.json();
-
-      if (
-        job.status === 'completed' ||
-        job.status === 'failed'
-      ) {
-        break;
-      }
-
-      await new Promise((resolvePromise) => {
-        setTimeout(resolvePromise, 50);
-      });
-    }
+    const job = await waitForJob(
+      origin,
+      app.token,
+      created.jobId,
+    );
 
     assert.equal(
       job?.status,
@@ -122,26 +164,22 @@ test('local app is loopback-only, token-protected and profiles a PBIP path end-t
       job?.message,
     );
 
-    const runbook = await fetch(
-      `${origin}/api/jobs/${created.jobId}/runbook?token=${app.token}`,
-    );
-    assert.equal(
-      runbook.status,
-      200,
-    );
-    assert.match(
-      await runbook.text(),
-      /PBI Profiling/,
+    const profile = await fetch(
+      origin +
+        '/api/jobs/' +
+        created.jobId +
+        '/profile?token=' +
+        app.token,
     );
 
-    const profile = await fetch(
-      `${origin}/api/jobs/${created.jobId}/profile?token=${app.token}`,
-    );
     assert.equal(
       profile.status,
       200,
     );
-    const profileJson = await profile.json();
+
+    const profileJson =
+      await profile.json();
+
     assert.equal(
       profileJson.overview.counts.tables,
       2,
@@ -158,30 +196,273 @@ test('local app is loopback-only, token-protected and profiles a PBIP path end-t
   }
 });
 
+test('browser PBIP staging validates and profiles the same relevant-file contract as local folders', async () => {
+  const root = mkdtempSync(
+    join(
+      tmpdir(),
+      'pbi-profiling-browser-project-',
+    ),
+  );
+  const sourceProject = join(
+    root,
+    'source-project',
+  );
+  writePbipFixture(sourceProject);
 
-test('local app creates PBIX upload workspace before streaming files with realistic names', async () => {
+  const relevantFiles =
+    readProjectFolder(sourceProject);
+
   const app = await startLocalApp({
     open: false,
   });
 
   try {
     const url = new URL(app.url);
-    const response = await fetch(
-      `${url.origin}/api/jobs/pbix?keepWorkspace=1&timeout=30`,
+    const origin = url.origin;
+
+    const create = await fetch(
+      origin + '/api/projects',
       {
         method: 'POST',
         headers: {
-          'content-type': 'application/octet-stream',
-          'x-file-name': encodeURIComponent(
-            '[PRD]SLA_POP_Novo_Analitico.pbix',
-          ),
-          'x-pbi-profiling-token': app.token,
+          'content-type':
+            'application/json',
+          'x-pbi-profiling-token':
+            app.token,
         },
-        body: Buffer.from('synthetic-pbix-body'),
+        body: JSON.stringify({
+          name: 'Browser selected project',
+        }),
       },
     );
 
-    const responseText = await response.text();
+    assert.equal(create.status, 201);
+    const created = await create.json();
+
+    for (const [path, fileContent] of relevantFiles) {
+      const upload = await fetch(
+        origin +
+          '/api/projects/' +
+          created.projectId +
+          '/files?path=' +
+          encodeURIComponent(path),
+        {
+          method: 'PUT',
+          headers: {
+            'content-type':
+              'application/octet-stream',
+            'x-pbi-profiling-token':
+              app.token,
+          },
+          body: Buffer.from(
+            fileContent,
+            'utf-8',
+          ),
+        },
+      );
+
+      const uploadText =
+        await upload.text();
+
+      assert.equal(
+        upload.status,
+        201,
+        uploadText,
+      );
+    }
+
+    const validate = await fetch(
+      origin +
+        '/api/projects/' +
+        created.projectId +
+        '/validate',
+      {
+        method: 'POST',
+        headers: {
+          'x-pbi-profiling-token':
+            app.token,
+        },
+      },
+    );
+
+    const validationText =
+      await validate.text();
+
+    assert.equal(
+      validate.status,
+      200,
+      validationText,
+    );
+
+    const validation =
+      JSON.parse(validationText);
+
+    assert.equal(validation.ready, true);
+    assert.equal(
+      validation.fileCount,
+      relevantFiles.size,
+    );
+
+    const run = await fetch(
+      origin +
+        '/api/projects/' +
+        created.projectId +
+        '/profile',
+      {
+        method: 'POST',
+        headers: {
+          'x-pbi-profiling-token':
+            app.token,
+        },
+      },
+    );
+
+    assert.equal(run.status, 202);
+    const started = await run.json();
+
+    const job = await waitForJob(
+      origin,
+      app.token,
+      started.jobId,
+    );
+
+    assert.equal(
+      job?.status,
+      'completed',
+      job?.message,
+    );
+
+    const profile = await fetch(
+      origin +
+        '/api/jobs/' +
+        started.jobId +
+        '/profile?token=' +
+        app.token,
+    );
+
+    assert.equal(
+      profile.status,
+      200,
+    );
+
+    const profileJson =
+      await profile.json();
+
+    assert.equal(
+      profileJson.overview.counts.tables,
+      2,
+    );
+    assert.equal(
+      profileJson.meta.projectName,
+      'Browser selected project',
+    );
+  } finally {
+    await app.close();
+    rmSync(
+      root,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+  }
+});
+
+test('browser PBIP staging rejects unsafe relative paths', async () => {
+  const app = await startLocalApp({
+    open: false,
+  });
+
+  try {
+    const url = new URL(app.url);
+    const origin = url.origin;
+
+    const create = await fetch(
+      origin + '/api/projects',
+      {
+        method: 'POST',
+        headers: {
+          'content-type':
+            'application/json',
+          'x-pbi-profiling-token':
+            app.token,
+        },
+        body: JSON.stringify({
+          name: 'Traversal test',
+        }),
+      },
+    );
+
+    const created = await create.json();
+
+    const upload = await fetch(
+      origin +
+        '/api/projects/' +
+        created.projectId +
+        '/files?path=' +
+        encodeURIComponent(
+          '../../escape.tmdl',
+        ),
+      {
+        method: 'PUT',
+        headers: {
+          'content-type':
+            'application/octet-stream',
+          'x-pbi-profiling-token':
+            app.token,
+        },
+        body: Buffer.from(
+          'table Test',
+          'utf-8',
+        ),
+      },
+    );
+
+    assert.equal(upload.status, 400);
+
+    const payload = await upload.json();
+
+    assert.match(
+      payload.error,
+      /unsafe segment|relative/i,
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test('PBIX upload contract remains streaming and accepts realistic corporate filenames', async () => {
+  const app = await startLocalApp({
+    open: false,
+  });
+
+  try {
+    const url = new URL(app.url);
+    const origin = url.origin;
+
+    const response = await fetch(
+      origin +
+        '/api/jobs/pbix?keepWorkspace=1&timeout=30',
+      {
+        method: 'POST',
+        headers: {
+          'content-type':
+            'application/octet-stream',
+          'x-file-name':
+            encodeURIComponent(
+              '[PRD]SLA_POP_Novo_Analitico.pbix',
+            ),
+          'x-pbi-profiling-token':
+            app.token,
+        },
+        body: Buffer.from(
+          'synthetic-pbix-body',
+        ),
+      },
+    );
+
+    const responseText =
+      await response.text();
 
     assert.equal(
       response.status,
@@ -189,107 +470,25 @@ test('local app creates PBIX upload workspace before streaming files with realis
       responseText,
     );
 
-    const payload = JSON.parse(responseText);
-    assert.ok(payload.jobId);
+    const payload =
+      JSON.parse(responseText);
 
-    let job;
-    const deadline = Date.now() + 10_000;
-
-    while (Date.now() < deadline) {
-      const status = await fetch(
-        `${url.origin}/api/jobs/${payload.jobId}`,
-        {
-          headers: {
-            'x-pbi-profiling-token': app.token,
-          },
-        },
-      );
-
-      assert.equal(status.status, 200);
-      job = await status.json();
-
-      if (
-        job.status === 'completed' ||
-        job.status === 'failed'
-      ) {
-        break;
-      }
-
-      await new Promise((resolvePromise) => {
-        setTimeout(resolvePromise, 50);
-      });
-    }
+    const job = await waitForJob(
+      origin,
+      app.token,
+      payload.jobId,
+    );
 
     assert.equal(job?.status, 'failed');
     assert.doesNotMatch(
       job.message,
       /ENOENT|no such file or directory/i,
     );
-    assert.match(
-      job.message,
-      /PBIX intake requires Windows/i,
-    );
-  } finally {
-    await app.close();
-  }
-});
 
-
-test('native picker endpoint is token-protected and reports platform availability explicitly', async () => {
-  const app = await startLocalApp({
-    open: false,
-  });
-
-  try {
-    const url = new URL(app.url);
-
-    const unauthorized = await fetch(
-      `${url.origin}/api/picker`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          kind: 'folder',
-        }),
-      },
-    );
-
-    assert.equal(
-      unauthorized.status,
-      403,
-    );
-
-    const response = await fetch(
-      `${url.origin}/api/picker`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-pbi-profiling-token': app.token,
-        },
-        body: JSON.stringify({
-          kind: 'folder',
-        }),
-      },
-    );
-
-    if (process.platform === 'win32') {
-      assert.notEqual(
-        response.status,
-        403,
-      );
-    } else {
-      assert.equal(
-        response.status,
-        501,
-      );
-
-      const payload = await response.json();
+    if (process.platform !== 'win32') {
       assert.match(
-        payload.error,
-        /available only on Windows/i,
+        job.message,
+        /PBIX intake requires Windows/i,
       );
     }
   } finally {

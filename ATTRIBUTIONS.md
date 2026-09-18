@@ -12,9 +12,11 @@
 - License: MIT
 - Copyright: Jihwan Kim
 - Integration: Git submodule at `vendor/pbi-lineage-lenz`; runtime imports the audited source directly from the pinned submodule and does not install or resolve npm packages.
-- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, dependency graph/lineage facts and the serializable viewer model.
+- Use: PBIP discovery primitives, TMDL/PBIR/DAX/M parsing, physical-source resolution, dependency graph/lineage facts, the serializable viewer model and the browser-folder intake pattern (`showDirectoryPicker` with `webkitdirectory` fallback and relevant-file filtering).
 
 The original MIT license remains applicable to the upstream source. The submodule preserves the upstream repository history and license verbatim.
+
+The browser-folder intake in `src/app/page.js` adapts the architecture of upstream `apps/web/src/readFolder.js`: File System Access API when available, `webkitdirectory` fallback otherwise, and the same relevant-file/skip-directory contract enforced again on the server through the pinned core `shouldRead()` function.
 
 The upstream `handoff` package was evaluated and used in earlier development versions, but it is no longer required at runtime because it invokes `esbuild`. The production lineage view is now an original dependency-free renderer in `src/report/lineage.js`, built from the normalized profiling contract. This change allows execution on locked-down corporate workstations without `npm install`.
 
@@ -58,7 +60,7 @@ The local implementation in `scripts/windows/convert-pbix.ps1` is an original Po
 - License: MIT.
 - Useful reference: local desktop workflow with PBIX/PBIP selection, temporary output and browser-oriented results.
 
-The `pbi-profiling` local UI is an original dependency-free HTTP/browser application. No WinForms or PBI Inspector source code is copied.
+The `pbi-profiling` local UI is an original dependency-free HTTP/browser application. PBI Inspector's desktop-dialog UX was evaluated, but deliberately not used for the web UI after testing showed the browser → Node → PowerShell → WinForms bridge to be fragile on locked-down workstations. No WinForms or PBI Inspector source code is copied.
 
 ## Reference only — no code reuse
 

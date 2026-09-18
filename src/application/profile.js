@@ -21,6 +21,7 @@ export async function profileTarget(
     configPath = null,
     keepWorkspace = false,
     desktopTimeoutMs = 300_000,
+    projectNameOverride = null,
     onProgress = () => {},
   } = {},
 ) {
@@ -44,7 +45,10 @@ export async function profileTarget(
     });
 
     const result = analyzeProject(prepared.projectRoot);
-    result.projectName = prepared.projectName || result.projectName;
+    result.projectName =
+      String(projectNameOverride ?? '').trim() ||
+      prepared.projectName ||
+      result.projectName;
 
     const businessContext = loadBusinessContext(
       prepared.contextRoot,

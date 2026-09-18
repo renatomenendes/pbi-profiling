@@ -119,16 +119,17 @@ node .\src\app.js
 
 O processo abre uma página em `127.0.0.1` com:
 
-- seletor nativo do Windows para PBIX;
-- seletor nativo para arquivo `.pbip`;
-- seletor nativo para pasta PBIP/`.SemanticModel`/`.Report`;
-- entrada manual de caminho como alternativa;
+- seletor de PBIX do próprio navegador;
+- seleção de pasta PBIP por `showDirectoryPicker()` quando disponível;
+- fallback `webkitdirectory` para navegadores sem File System Access API;
+- pré-validação estrutural do PBIP antes de habilitar o profiling;
+- entrada manual de caminho como modo avançado;
 - progresso do job;
 - abertura do runbook;
 - download local de `profile.json` e `profile.rag.jsonl`;
-- opção de preservar o PBIP temporário.
+- opção de preservar o PBIP temporário criado a partir de PBIX.
 
-A UI não usa CDN, telemetria ou serviços externos. No Windows, a seleção é feita por diálogos nativos e o pipeline recebe o caminho local diretamente; um PBIX grande não é copiado pelo navegador para o próprio servidor local. A rota de upload permanece apenas como compatibilidade técnica do servidor.
+A UI não usa CDN, telemetria, WinForms ou serviços externos. O navegador é responsável apenas pela seleção; arquivos PBIX e os artefatos textuais relevantes do PBIP são enviados por streaming para o servidor local em loopback. PowerShell permanece restrito à conversão PBIX/TOM, onde o Power BI Desktop é tecnicamente necessário.
 
 ## Execução zero-install
 
@@ -338,6 +339,6 @@ node .\scripts\check.js
 node .\scripts\test.js
 ```
 
-O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes, smoke test do CLI e parsing dos adapters Windows no Windows PowerShell 5.1.
+O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes, smoke test do CLI e parsing do adapter PBIX no Windows PowerShell 5.1.
 
 Os gates públicos usam somente fixtures sintéticas/open source; artefatos corporativos não são versionados neste repositório.
