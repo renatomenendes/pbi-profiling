@@ -257,6 +257,126 @@ function Get-WorkspacePorts {
     return @($result)
 }
 
+function Get-ProcessPorts {
+    $processes = @(Get-Process -Name msmdsrv -ErrorAction SilentlyContinue)
+
+    if ($processes.Count -eq 0) {
+        return @()
+    }
+
+    $processById = @{}
+    foreach ($process in $processes) {
+        $startedUtc = $null
+        try {
+            $startedUtc = $process.StartTime.ToUniversalTime()
+        }
+        catch {
+        }
+
+        $processById[[string]$process.Id] = [PSCustomObject]@{
+            ProcessId = [int]$process.Id
+            ProcessStartUtc = $startedUtc
+        }
+    }
+
+    $result = @()
+    $netstat = Join-Path $env:SystemRoot 'System32\netstat.exe'
+
+    try {
+        $lines = @(& $netstat -ano -p tcp 2>$null)
+    }
+    catch {
+        return @()
+    }
+
+    foreach ($line in $lines) {
+        if ($line -notmatch '^\s*TCP\s+(?<Local>\S+)\s+\S+\s+LISTENING\s+(?<Pid>\d+)\s*$') {
+            continue
+        }
+
+        $pidKey = [string]$Matches['Pid']
+        if (-not $processById.ContainsKey($pidKey)) {
+            continue
+        }
+
+        $localEndpoint = [string]$Matches['Local']
+        if ($localEndpoint -notmatch ':(?<Port>\d+)$') {
+            continue
+        }
+
+        $port = [int]$Matches['Port']
+        if ($port -lt 1 -or $port -gt 65535) {
+            continue
+        }
+
+        $meta = $processById[$pidKey]
+        $result += [PSCustomObject]@{
+            Workspace = $null
+            Port = $port
+            ProcessId = $meta.ProcessId
+            ProcessStartUtc = $meta.ProcessStartUtc
+            LastWriteTimeUtc = [DateTime]::MinValue
+            Source = 'process'
+        }
+    }
+
+    return @($result | Sort-Object Port, ProcessId -Unique)
+}
+
+function Get-DesktopModelCandidates {
+    $byPort = @{}
+
+    foreach ($candidate in Get-ProcessPorts) {
+        $byPort[[string]$candidate.Port] = $candidate
+    }
+
+    foreach ($workspace in Get-WorkspacePorts) {
+        $key = [string]$workspace.Port
+
+        if ($byPort.ContainsKey($key)) {
+            $existing = $byPort[$key]
+            $byPort[$key] = [PSCustomObject]@{
+                Workspace = $workspace.Workspace
+                Port = $workspace.Port
+                ProcessId = $existing.ProcessId
+                ProcessStartUtc = $existing.ProcessStartUtc
+                LastWriteTimeUtc = $workspace.LastWriteTimeUtc
+                Source = 'process+workspace'
+            }
+        }
+        else {
+            $byPort[$key] = [PSCustomObject]@{
+                Workspace = $workspace.Workspace
+                Port = $workspace.Port
+                ProcessId = $null
+                ProcessStartUtc = $null
+                LastWriteTimeUtc = $workspace.LastWriteTimeUtc
+                Source = 'workspace'
+            }
+        }
+    }
+
+    return @($byPort.Values | Sort-Object Port)
+}
+
+function Get-CandidateIdentity {
+    param(
+        [Parameter(Mandatory = $true)]$Candidate
+    )
+
+    $processId = ''
+    if ($null -ne $Candidate.ProcessId) {
+        $processId = [string]$Candidate.ProcessId
+    }
+
+    $workspace = ''
+    if ($Candidate.Workspace) {
+        $workspace = [string]$Candidate.Workspace
+    }
+
+    return ([string]$Candidate.Port + '|' + $processId + '|' + $workspace)
+}
+
 function Get-LiveModelInfo {
     param(
         [Parameter(Mandatory = $true)][int]$Port
@@ -308,21 +428,56 @@ function Get-LiveModelInfo {
 
 function Wait-NewDesktopModel {
     param(
-        [Parameter(Mandatory = $true)]$PreviousPorts,
+        [Parameter(Mandatory = $true)]$PreviousCandidates,
+        [Parameter(Mandatory = $true)][DateTime]$StartedUtc,
         [Parameter(Mandatory = $true)][int]$TimeoutMs
     )
 
     $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
     $lastCounts = @{}
+    $lastCandidateSignature = ''
+    $observedPorts = New-Object 'System.Collections.Generic.HashSet[int]'
+    $observedProcessIds = New-Object 'System.Collections.Generic.HashSet[int]'
 
     while ([DateTime]::UtcNow -lt $deadline) {
-        $current = @(
-            Get-WorkspacePorts |
-            Where-Object {
-                -not $PreviousPorts.ContainsKey([string]$_.Port)
-            } |
-            Sort-Object LastWriteTimeUtc -Descending
-        )
+        $allCandidates = @(Get-DesktopModelCandidates)
+        $current = @()
+
+        foreach ($candidate in $allCandidates) {
+            [void]$observedPorts.Add([int]$candidate.Port)
+            if ($null -ne $candidate.ProcessId) {
+                [void]$observedProcessIds.Add([int]$candidate.ProcessId)
+            }
+
+            $identity = Get-CandidateIdentity -Candidate $candidate
+            $isNewIdentity = -not $PreviousCandidates.ContainsKey($identity)
+            $isNewProcess = (
+                $null -ne $candidate.ProcessStartUtc -and
+                $candidate.ProcessStartUtc -ge $StartedUtc.AddSeconds(-5)
+            )
+            $isRecentWorkspace = (
+                $candidate.LastWriteTimeUtc -gt [DateTime]::MinValue -and
+                $candidate.LastWriteTimeUtc -ge $StartedUtc.AddSeconds(-5)
+            )
+
+            if ($isNewIdentity -or $isNewProcess -or $isRecentWorkspace) {
+                $current += $candidate
+            }
+        }
+
+        $parts = @()
+        foreach ($candidate in $current) {
+            $parts += ([string]$candidate.Port + ':' + [string]$candidate.ProcessId + ':' + [string]$candidate.Source)
+        }
+        $signature = $parts -join ','
+
+        if ($signature -ne $lastCandidateSignature) {
+            $lastCandidateSignature = $signature
+            if ($current.Count -gt 0) {
+                $message = 'Detected ' + [string]$current.Count + ' candidate local model endpoint(s): ' + $signature
+                Write-ProgressEvent -Phase 'model-candidates' -Message $message
+            }
+        }
 
         foreach ($candidate in $current) {
             $info = Get-LiveModelInfo -Port $candidate.Port
@@ -342,6 +497,9 @@ function Wait-NewDesktopModel {
                 return [PSCustomObject]@{
                     Workspace = $candidate.Workspace
                     Port = $candidate.Port
+                    ProcessId = $candidate.ProcessId
+                    ProcessStartUtc = $candidate.ProcessStartUtc
+                    Source = $candidate.Source
                     DatabaseName = $info.DatabaseName
                     TableCount = $info.TableCount
                     MeasureCount = $info.MeasureCount
@@ -352,14 +510,26 @@ function Wait-NewDesktopModel {
         Start-Sleep -Milliseconds 1500
     }
 
-    throw @'
-Power BI Desktop was launched, but no new stable local semantic model became
-available before the timeout. Do not save the file manually as PBIP: this
-adapter never requires Save As. The PBIX may still be loading, waiting for user
-interaction, blocked by credentials, or already open in another Desktop session.
-If this PBIX was already open before profiling, close that window and retry so
-the adapter can correlate a newly created Analysis Services port safely.
-'@
+    $portsText = 'none'
+    if ($observedPorts.Count -gt 0) {
+        $portsText = (@($observedPorts) | Sort-Object) -join ', '
+    }
+
+    $processesText = 'none'
+    if ($observedProcessIds.Count -gt 0) {
+        $processesText = (@($observedProcessIds) | Sort-Object) -join ', '
+    }
+
+    $detail = (
+        'Power BI Desktop opened the PBIX, but pbi-profiling could not correlate a new stable local Analysis Services model before the timeout. ' +
+        'No manual Save As is required. Discovery observed ports: ' + $portsText +
+        '; msmdsrv process IDs: ' + $processesText + '. ' +
+        'The adapter checks both live msmdsrv TCP listeners and msmdsrv.port.txt workspace files. ' +
+        'If Power BI Desktop is showing a credential, privacy-level, refresh, recovery, or other blocking dialog, resolve that dialog and retry. ' +
+        'Otherwise report this exact message so the remaining identity issue can be diagnosed without guessing.'
+    )
+
+    throw $detail
 }
 
 function Copy-ZipEntry {
@@ -657,17 +827,18 @@ $desktopExecutable = Get-PowerBIDesktopExecutable
 $tomDirectory = Get-TomDirectory -DesktopExecutable $desktopExecutable
 Import-TomAssemblies -TomDirectory $tomDirectory
 
-$beforePorts = @{}
-foreach ($workspace in Get-WorkspacePorts) {
-    $beforePorts[[string]$workspace.Port] = $true
+$beforeCandidates = @{}
+foreach ($candidate in Get-DesktopModelCandidates) {
+    $identity = Get-CandidateIdentity -Candidate $candidate
+    $beforeCandidates[$identity] = $true
 }
-
 Write-ProgressEvent -Phase 'opening-desktop' -Message 'Opening PBIX in Power BI Desktop to materialize the semantic model. No manual Save As is required.'
+$startedUtc = [DateTime]::UtcNow
 $quotedPbix = '"' + $pbix.Replace('"', '""') + '"'
 $desktopProcess = Start-Process -FilePath $desktopExecutable -ArgumentList $quotedPbix -PassThru
 
 Write-ProgressEvent -Phase 'waiting-model' -Message 'Waiting for a new stable local Analysis Services model.'
-$modelSession = Wait-NewDesktopModel -PreviousPorts $beforePorts -TimeoutMs $timeoutMs
+$modelSession = Wait-NewDesktopModel -PreviousCandidates $beforeCandidates -StartedUtc $startedUtc -TimeoutMs $timeoutMs
 
 Write-ProgressEvent -Phase 'serializing-tmdl' -Message 'Serializing the live semantic model with Microsoft TOM.'
 $modelInfo = Export-Tmdl -Port $modelSession.Port -Destination $modelDefinition -ProjectName $projectName

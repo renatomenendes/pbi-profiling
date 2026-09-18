@@ -52,3 +52,32 @@ jobs:
 
       - name: CLI smoke test
         run: node ./src/cli.js --help
+
+
+  powershell-contract:
+    name: Windows PowerShell 5.1 contract
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PBIX adapter with Windows PowerShell
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path '.\scripts\windows\convert-pbix.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object {
+              Write-Error $_.Message
+            }
+            exit 1
+          }
+
+          Write-Host 'Windows PowerShell syntax OK'
