@@ -122,3 +122,48 @@ test('CLI auto-loads a valid business context sidecar without embedding its abso
     });
   }
 });
+
+
+test('CLI rejects PBIX and requires official Save As PBIP workflow', async () => {
+  const root = mkdtempSync(
+    join(
+      tmpdir(),
+      'pbi-profiling-cli-pbix-rejected-',
+    ),
+  );
+  const pbix = join(
+    root,
+    'Sample.pbix',
+  );
+  const output = join(
+    root,
+    'output',
+  );
+
+  try {
+    writeFileSync(
+      pbix,
+      'synthetic',
+      'utf-8',
+    );
+
+    await assert.rejects(
+      () =>
+        runCli([
+          'profile',
+          pbix,
+          '--output',
+          output,
+        ]),
+      /Save As.*Power BI Project.*\.pbip/i,
+    );
+  } finally {
+    rmSync(
+      root,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+  }
+});
