@@ -1,27 +1,27 @@
-name: Release v1.0.0
+name: Release
 
 on:
   push:
-    branches:
-      - release/v1.0.0
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-v1.0.0
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Build and publish v1.0.0
+    name: Build and publish ${{ github.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout approved main
+      - name: Checkout release tag
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.ref }}
           fetch-depth: 0
           submodules: recursive
 
@@ -30,9 +30,12 @@ jobs:
         with:
           node-version: 24
 
-      - name: Verify release version
+      - name: Verify release contract
         run: |
-          test "$(node -p "require('./package.json').version")" = "1.0.0"
+          VERSION="${GITHUB_REF_NAME#v}"
+          test "${GITHUB_REF_NAME}" = "v${VERSION}"
+          test "$(node -p "require('./package.json').version")" = "${VERSION}"
+          test -f "docs/releases/${GITHUB_REF_NAME}.md"
 
       - name: Run release quality gates
         run: |
@@ -45,7 +48,9 @@ jobs:
           test "$(git -C vendor/pbi-lineage-lenz rev-parse HEAD)" = "7e2c61cac2f5e0ca6e7135df17a6918c89c42aec"
 
       - name: Build portable package
-        run: node ./scripts/package-release.js 1.0.0
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node ./scripts/package-release.js "${VERSION}"
 
       - name: Create synthetic PBIP
         env:
@@ -58,7 +63,8 @@ jobs:
           FIXTURE_DIR: ${{ runner.temp }}/release-fixture
           OUTPUT_DIR: ${{ runner.temp }}/staged-output
         run: |
-          PACKAGE_DIR="dist/pbi-profiling-v1.0.0-windows-portable"
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_DIR="dist/pbi-profiling-v${VERSION}-windows-portable"
 
           node "${PACKAGE_DIR}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
 
@@ -68,7 +74,8 @@ jobs:
 
       - name: Create deterministic ZIP and checksum
         run: |
-          PACKAGE_BASENAME="pbi-profiling-v1.0.0-windows-portable"
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
           PACKAGE_DIR="dist/${PACKAGE_BASENAME}"
           ASSET="${PACKAGE_BASENAME}.zip"
 
@@ -91,10 +98,13 @@ jobs:
           FIXTURE_DIR: ${{ runner.temp }}/release-fixture
           OUTPUT_DIR: ${{ runner.temp }}/zip-output
         run: |
-          mkdir -p "${RUNNER_TEMP}/release-unpacked"
-          unzip -q             release/pbi-profiling-v1.0.0-windows-portable.zip             -d "${RUNNER_TEMP}/release-unpacked"
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
 
-          PACKAGE_DIR="${RUNNER_TEMP}/release-unpacked/pbi-profiling-v1.0.0-windows-portable"
+          mkdir -p "${RUNNER_TEMP}/release-unpacked"
+          unzip -q             "release/${PACKAGE_BASENAME}.zip"             -d "${RUNNER_TEMP}/release-unpacked"
+
+          PACKAGE_DIR="${RUNNER_TEMP}/release-unpacked/${PACKAGE_BASENAME}"
 
           node "${PACKAGE_DIR}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
 
@@ -110,28 +120,23 @@ jobs:
       - name: Upload audited release assets
         uses: actions/upload-artifact@v4
         with:
-          name: pbi-profiling-v1.0.0-release-assets
+          name: pbi-profiling-${{ github.ref_name }}-release-assets
           path: |
-            release/pbi-profiling-v1.0.0-windows-portable.zip
+            release/pbi-profiling-*-windows-portable.zip
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 90
-
-      - name: Create immutable release tag
-        run: |
-          if git ls-remote --exit-code --tags origin refs/tags/v1.0.0 >/dev/null 2>&1; then
-            echo "Tag v1.0.0 already exists; refusing to overwrite it."
-            exit 1
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git tag -a v1.0.0 "$(git rev-parse HEAD)" -m "pbi-profiling v1.0.0"
-          git push origin v1.0.0
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create v1.0.0             release/pbi-profiling-v1.0.0-windows-portable.zip             release/SHA256SUMS.txt             --repo "${GITHUB_REPOSITORY}"             --title "pbi-profiling v1.0.0"             --notes-file docs/releases/v1.0.0.md             --verify-tag
+          VERSION="${GITHUB_REF_NAME#v}"
+          ASSET="release/pbi-profiling-v${VERSION}-windows-portable.zip"
+
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+          gh release create "${GITHUB_REF_NAME}"             "${ASSET}"             release/SHA256SUMS.txt             --repo "${GITHUB_REPOSITORY}"             --title "pbi-profiling ${GITHUB_REF_NAME}"             --notes-file "docs/releases/${GITHUB_REF_NAME}.md"             --verify-tag
