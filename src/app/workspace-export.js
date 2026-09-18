@@ -119,31 +119,11 @@ export async function exportWorkspaceToDirectory(
   const safeProjectName =
     sanitizeFolderName(projectName);
   const target =
-    await createUniqueDirectory(
+    await copyWorkspaceToUniqueTarget(
+      source,
       base,
       `${safeProjectName}-PBIP`,
     );
-
-  try {
-    await cp(
-      source,
-      target,
-      {
-        recursive: true,
-        errorOnExist: true,
-        force: false,
-      },
-    );
-  } catch (error) {
-    rmSync(
-      target,
-      {
-        recursive: true,
-        force: true,
-      },
-    );
-    throw error;
-  }
 
   const files =
     listWorkspaceFiles(target);
@@ -210,7 +190,8 @@ export function removeWorkspace(
   );
 }
 
-async function createUniqueDirectory(
+async function copyWorkspaceToUniqueTarget(
+  source,
   parent,
   baseName,
 ) {
@@ -233,17 +214,32 @@ async function createUniqueDirectory(
     }
 
     try {
-      await mkdir(
+      await cp(
+        source,
         candidate,
         {
-          recursive: false,
+          recursive: true,
+          errorOnExist: true,
+          force: false,
         },
       );
       return candidate;
     } catch (error) {
-      if (error?.code === 'EEXIST') {
+      rmSync(
+        candidate,
+        {
+          recursive: true,
+          force: true,
+        },
+      );
+
+      if (
+        error?.code === 'EEXIST' ||
+        error?.code === 'ERR_FS_CP_EEXIST'
+      ) {
         continue;
       }
+
       throw error;
     }
   }
