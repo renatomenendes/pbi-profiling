@@ -1334,12 +1334,22 @@ export function renderAppPage() {
           const writable =
             await fileHandle.createWritable();
 
-          try {
-            await writable.write(
-              await response.arrayBuffer(),
+          if (
+            response.body &&
+            typeof response.body.pipeTo ===
+              'function'
+          ) {
+            await response.body.pipeTo(
+              writable,
             );
-          } finally {
-            await writable.close();
+          } else {
+            try {
+              await writable.write(
+                await response.arrayBuffer(),
+              );
+            } finally {
+              await writable.close();
+            }
           }
 
           completed += 1;
