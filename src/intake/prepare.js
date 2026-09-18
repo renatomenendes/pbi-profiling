@@ -176,6 +176,7 @@ export async function prepareProfilingTarget(
       reportFormat: converted.reportFormat,
       modelStatus: converted.modelStatus,
       desktopOpened: Boolean(converted.desktopOpened),
+      desktopLeftOpen: Boolean(converted.desktopLeftOpen),
       modelTableCount: converted.modelTableCount ?? null,
     },
   };
