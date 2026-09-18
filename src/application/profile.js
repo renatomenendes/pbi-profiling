@@ -22,95 +22,122 @@ export async function profileTarget(
     outputDirectory,
     contextPath = null,
     configPath = null,
-    keepWorkspace = false,
-    desktopTimeoutMs = 300_000,
     projectNameOverride = null,
     onProgress = () => {},
   } = {},
 ) {
   if (!outputDirectory) {
-    throw new Error('outputDirectory is required.');
+    throw new Error(
+      'outputDirectory is required.',
+    );
   }
 
-  const prepared = await prepareProfilingTarget(
-    targetPath,
-    {
-      keepWorkspace,
-      desktopTimeoutMs,
-      onProgress,
-    },
-  );
+  const prepared =
+    await prepareProfilingTarget(
+      targetPath,
+    );
 
   try {
     onProgress({
       phase: 'analyzing',
-      message: 'Analyzing PBIP/TMDL/PBIR structure.',
+      message:
+        'Analyzing PBIP/TMDL/PBIR structure.',
     });
 
-    const result = analyzeProject(prepared.projectRoot);
+    const result =
+      analyzeProject(
+        prepared.projectRoot,
+      );
+
     assertAnalyzedProjectIsProfileable(
       result,
       {
-        expected:
-          prepared.conversion ?? null,
-        source:
-          prepared.converted
-            ? 'Converted PBIP'
-            : 'PBIP project',
+        source: 'PBIP project',
       },
     );
 
     result.projectName =
-      String(projectNameOverride ?? '').trim() ||
+      String(
+        projectNameOverride ?? '',
+      ).trim() ||
       prepared.projectName ||
       result.projectName;
 
-    const businessContext = loadBusinessContext(
-      prepared.contextRoot,
-      contextPath,
-    );
-    const profilingConfig = loadProfilingConfig(
-      prepared.contextRoot,
-      configPath,
-    );
+    const businessContext =
+      loadBusinessContext(
+        prepared.contextRoot,
+        contextPath,
+      );
 
-    const profile = buildProfile(
-      result,
-      {
-        businessContext,
-        profilingConfig,
-      },
-    );
+    const profilingConfig =
+      loadProfilingConfig(
+        prepared.contextRoot,
+        configPath,
+      );
+
+    const profile =
+      buildProfile(
+        result,
+        {
+          businessContext,
+          profilingConfig,
+        },
+      );
 
     onProgress({
       phase: 'rendering',
-      message: 'Rendering runbook, structured profile and RAG chunks.',
+      message:
+        'Rendering runbook, structured profile and RAG chunks.',
     });
 
-    const lineageHtml = renderLineageHtml(profile);
-    const reportHtml = renderEnhancedReportHtml({
-      profile,
-      lineageHtml,
-    });
-    const ragJsonl = renderExtendedRagJsonl(profile);
+    const lineageHtml =
+      renderLineageHtml(profile);
 
-    const output = resolve(outputDirectory);
-    const jsonFile = writeJsonAtomic(
-      resolve(output, 'profile.json'),
-      profile,
-    );
-    const htmlFile = writeTextAtomic(
-      resolve(output, 'profile.html'),
-      reportHtml,
-    );
-    const ragFile = writeTextAtomic(
-      resolve(output, 'profile.rag.jsonl'),
-      ragJsonl,
-    );
+    const reportHtml =
+      renderEnhancedReportHtml({
+        profile,
+        lineageHtml,
+      });
+
+    const ragJsonl =
+      renderExtendedRagJsonl(
+        profile,
+      );
+
+    const output =
+      resolve(outputDirectory);
+
+    const jsonFile =
+      writeJsonAtomic(
+        resolve(
+          output,
+          'profile.json',
+        ),
+        profile,
+      );
+
+    const htmlFile =
+      writeTextAtomic(
+        resolve(
+          output,
+          'profile.html',
+        ),
+        reportHtml,
+      );
+
+    const ragFile =
+      writeTextAtomic(
+        resolve(
+          output,
+          'profile.rag.jsonl',
+        ),
+        ragJsonl,
+      );
 
     onProgress({
       phase: 'completed',
-      message: 'Runbook generated successfully.',
+      message:
+        'Runbook generated successfully.',
     });
 
     return {
@@ -120,11 +147,9 @@ export async function profileTarget(
         json: jsonFile,
         rag: ragFile,
       },
-      intake: prepared.summary,
-      workspacePath:
-        keepWorkspace && prepared.workspacePath
-          ? prepared.workspacePath
-          : null,
+      intake:
+        prepared.summary,
+      workspacePath: null,
     };
   } finally {
     prepared.cleanup();

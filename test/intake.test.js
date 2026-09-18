@@ -12,16 +12,25 @@ import test from 'node:test';
 import { classifyTarget } from '../src/intake/prepare.js';
 import { writePbipFixture } from './fixtures/pbip.js';
 
-test('universal intake classifies PBIP folders, PBIP files and artifact folders deterministically', () => {
+test('intake classifies PBIP folders, PBIP files and artifact folders deterministically', () => {
   const root = mkdtempSync(
-    join(tmpdir(), 'pbi-profiling-intake-'),
+    join(
+      tmpdir(),
+      'pbi-profiling-intake-',
+    ),
   );
-  const project = join(root, 'Project');
+  const project =
+    join(root, 'Project');
 
   try {
     writePbipFixture(project);
 
-    const pbipFile = join(project, 'Project.pbip');
+    const pbipFile =
+      join(
+        project,
+        'Project.pbip',
+      );
+
     writeFileSync(
       pbipFile,
       JSON.stringify({
@@ -29,7 +38,8 @@ test('universal intake classifies PBIP folders, PBIP files and artifact folders 
         artifacts: [
           {
             report: {
-              path: 'Sample.Report',
+              path:
+                'Sample.Report',
             },
           },
         ],
@@ -38,32 +48,61 @@ test('universal intake classifies PBIP folders, PBIP files and artifact folders 
     );
 
     assert.equal(
-      classifyTarget(project).kind,
+      classifyTarget(
+        project,
+      ).kind,
       'pbip-folder',
     );
 
-    const fileTarget = classifyTarget(pbipFile);
-    assert.equal(fileTarget.kind, 'pbip-file');
-    assert.equal(fileTarget.projectRoot, project);
-    assert.equal(fileTarget.projectName, 'Project');
+    const fileTarget =
+      classifyTarget(pbipFile);
 
-    const semantic = classifyTarget(
-      join(project, 'Sample.SemanticModel'),
+    assert.equal(
+      fileTarget.kind,
+      'pbip-file',
     );
+    assert.equal(
+      fileTarget.projectRoot,
+      project,
+    );
+    assert.equal(
+      fileTarget.projectName,
+      'Project',
+    );
+
+    const semantic =
+      classifyTarget(
+        join(
+          project,
+          'Sample.SemanticModel',
+        ),
+      );
+
     assert.equal(
       semantic.kind,
       'semantic-model-folder',
     );
-    assert.equal(semantic.projectRoot, project);
-
-    const report = classifyTarget(
-      join(project, 'Sample.Report'),
+    assert.equal(
+      semantic.projectRoot,
+      project,
     );
+
+    const report =
+      classifyTarget(
+        join(
+          project,
+          'Sample.Report',
+        ),
+      );
+
     assert.equal(
       report.kind,
       'report-folder',
     );
-    assert.equal(report.projectRoot, project);
+    assert.equal(
+      report.projectRoot,
+      project,
+    );
   } finally {
     rmSync(
       root,
@@ -75,16 +114,65 @@ test('universal intake classifies PBIP folders, PBIP files and artifact folders 
   }
 });
 
-test('universal intake rejects unsupported file extensions explicitly', () => {
+test('intake rejects PBIX and PBIT with explicit Save As PBIP guidance', () => {
   const root = mkdtempSync(
-    join(tmpdir(), 'pbi-profiling-intake-invalid-'),
+    join(
+      tmpdir(),
+      'pbi-profiling-non-pbip-',
+    ),
   );
-  const file = join(root, 'model.xlsx');
 
   try {
-    mkdirSync(root, {
-      recursive: true,
-    });
+    for (
+      const name of [
+        'Sample.pbix',
+        'Sample.pbit',
+      ]
+    ) {
+      const file =
+        join(root, name);
+
+      writeFileSync(
+        file,
+        'synthetic',
+        'utf-8',
+      );
+
+      assert.throws(
+        () =>
+          classifyTarget(file),
+        /Save As.*Power BI Project.*\.pbip/i,
+      );
+    }
+  } finally {
+    rmSync(
+      root,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+  }
+});
+
+test('intake rejects unsupported file extensions explicitly', () => {
+  const root = mkdtempSync(
+    join(
+      tmpdir(),
+      'pbi-profiling-intake-invalid-',
+    ),
+  );
+  const file =
+    join(root, 'model.xlsx');
+
+  try {
+    mkdirSync(
+      root,
+      {
+        recursive: true,
+      },
+    );
+
     writeFileSync(
       file,
       'not a Power BI artifact',
@@ -92,7 +180,8 @@ test('universal intake rejects unsupported file extensions explicitly', () => {
     );
 
     assert.throws(
-      () => classifyTarget(file),
+      () =>
+        classifyTarget(file),
       /Unsupported Power BI target/i,
     );
   } finally {

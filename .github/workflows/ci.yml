@@ -53,7 +53,6 @@ jobs:
       - name: CLI smoke test
         run: node ./src/cli.js --help
 
-
   powershell-contract:
     name: Windows PowerShell 5.1 contract
     runs-on: windows-latest
@@ -62,28 +61,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Parse Windows adapters with Windows PowerShell
+      - name: Parse Windows PBIX launcher with Windows PowerShell
         shell: powershell
         run: |
-          $scripts = @(
-            '.\scripts\windows\convert-pbix.ps1'
-          )
+          $script = '.\scripts\windows\open-pbix.ps1'
+          $tokens = $null
+          $errors = $null
 
-          foreach ($script in $scripts) {
-            $tokens = $null
-            $errors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile(
-              (Resolve-Path $script),
-              [ref]$tokens,
-              [ref]$errors
-            ) | Out-Null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $script),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
 
-            if ($errors.Count -gt 0) {
-              $errors | ForEach-Object {
-                Write-Error "${script}: $($_.Message)"
-              }
-              exit 1
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object {
+              Write-Error "${script}: $($_.Message)"
             }
-
-            Write-Host "Windows PowerShell syntax OK: $script"
+            exit 1
           }
+
+          Write-Host "Windows PowerShell syntax OK: $script"

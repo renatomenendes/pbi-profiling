@@ -5,13 +5,9 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
-  statSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
-import {
-  homedir,
-  tmpdir,
-} from 'node:os';
+import { tmpdir } from 'node:os';
 import {
   basename,
   dirname,
@@ -24,11 +20,7 @@ import {
 } from 'node:crypto';
 
 import { profileTarget } from '../application/profile.js';
-import { convertPbixTarget } from '../application/convert.js';
-import {
-  assertAnalyzedProjectIsProfileable,
-} from '../application/validation.js';
-import { analyzeProject } from '../engine/analyze.js';
+import { openPbixInDesktop } from '../intake/open-pbix.js';
 import { renderAppPage } from './page.js';
 import { openBrowser } from './open.js';
 import {
@@ -36,15 +28,9 @@ import {
   receiveBrowserProjectFile,
   validateBrowserProjectUpload,
 } from './project-upload.js';
-import {
-  exportWorkspaceToDirectory,
-  listWorkspaceFiles,
-  removeWorkspace,
-  resolveWorkspaceFile,
-} from './workspace-export.js';
 
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024 * 1024;
-const MAX_JSON_BYTES = 64 * 1024;
+const MAX_UPLOAD_BYTES =
+  8 * 1024 * 1024 * 1024;
 
 export async function startLocalApp(
   {
@@ -53,15 +39,22 @@ export async function startLocalApp(
     open = true,
   } = {},
 ) {
-  if (host !== '127.0.0.1' && host !== 'localhost') {
+  if (
+    host !== '127.0.0.1' &&
+    host !== 'localhost'
+  ) {
     throw new Error(
       'The local app may listen only on loopback.',
     );
   }
 
-  const token = randomBytes(24).toString('hex');
+  const token =
+    randomBytes(24).toString('hex');
   const appRoot = mkdtempSync(
-    join(tmpdir(), 'pbi-profiling-app-'),
+    join(
+      tmpdir(),
+      'pbi-profiling-app-',
+    ),
   );
   const jobs = new Map();
   const projectUploads = new Map();
@@ -98,21 +91,38 @@ export async function startLocalApp(
     },
   );
 
-  await new Promise((resolvePromise, rejectPromise) => {
-    server.once('error', rejectPromise);
-    server.listen(port, host, () => {
-      server.off('error', rejectPromise);
-      resolvePromise();
-    });
-  });
+  await new Promise(
+    (resolvePromise, rejectPromise) => {
+      server.once(
+        'error',
+        rejectPromise,
+      );
+      server.listen(
+        port,
+        host,
+        () => {
+          server.off(
+            'error',
+            rejectPromise,
+          );
+          resolvePromise();
+        },
+      );
+    },
+  );
 
   const address = server.address();
   const actualPort =
-    typeof address === 'object' && address
+    typeof address === 'object' &&
+    address
       ? address.port
       : port;
+
   const url =
-    `http://127.0.0.1:${actualPort}/?token=${encodeURIComponent(token)}`;
+    'http://127.0.0.1:' +
+    actualPort +
+    '/?token=' +
+    encodeURIComponent(token);
 
   if (open) {
     openBrowser(url);
@@ -128,23 +138,24 @@ export async function startLocalApp(
       if (closed) {
         return;
       }
+
       closed = true;
 
-      await new Promise((resolvePromise) => {
-        server.close(() => resolvePromise());
-      });
+      await new Promise(
+        (resolvePromise) => {
+          server.close(
+            () => resolvePromise(),
+          );
+        },
+      );
 
-      for (const job of jobs.values()) {
-        if (job.workspacePath) {
-          removeWorkspace(job.workspacePath);
-          job.workspacePath = null;
-        }
-      }
-
-      rmSync(appRoot, {
-        recursive: true,
-        force: true,
-      });
+      rmSync(
+        appRoot,
+        {
+          recursive: true,
+          force: true,
+        },
+      );
     },
   };
 }
@@ -172,24 +183,37 @@ async function handleRequest(
     sendHtml(
       response,
       200,
-      renderAppPage({
-        defaultExportRoot: join(
-          homedir(),
-          'pbi-profiling',
-          'exports',
-        ),
-      }),
+      renderAppPage(),
     );
     return;
   }
 
-  if (!authorized(request, url, token)) {
+  if (
+    !authorized(
+      request,
+      url,
+      token,
+    )
+  ) {
     sendJson(
       response,
       403,
       {
-        error: 'Invalid local-app session token.',
+        error:
+          'Invalid local-app session token.',
       },
+    );
+    return;
+  }
+
+  if (
+    request.method === 'POST' &&
+    url.pathname === '/api/pbix/open'
+  ) {
+    await handlePbixOpen(
+      request,
+      response,
+      appRoot,
     );
     return;
   }
@@ -198,11 +222,14 @@ async function handleRequest(
     request.method === 'POST' &&
     url.pathname === '/api/projects'
   ) {
-    const payload = await readJsonBody(request);
-    const upload = createBrowserProjectUpload(
-      appRoot,
-      payload.name,
-    );
+    const payload =
+      await readJsonBody(request);
+
+    const upload =
+      createBrowserProjectUpload(
+        appRoot,
+        payload.name,
+      );
 
     projectUploads.set(
       upload.id,
@@ -224,14 +251,17 @@ async function handleRequest(
 
   if (projectRoute) {
     const upload =
-      projectUploads.get(projectRoute.id);
+      projectUploads.get(
+        projectRoute.id,
+      );
 
     if (!upload) {
       sendJson(
         response,
         404,
         {
-          error: 'Staged project not found.',
+          error:
+            'Staged project not found.',
         },
       );
       return;
@@ -246,7 +276,9 @@ async function handleRequest(
           await receiveBrowserProjectFile(
             request,
             upload,
-            url.searchParams.get('path'),
+            url.searchParams.get(
+              'path',
+            ),
           );
 
         sendJson(
@@ -271,7 +303,8 @@ async function handleRequest(
 
     if (
       request.method === 'POST' &&
-      projectRoute.action === 'validate'
+      projectRoute.action ===
+        'validate'
     ) {
       try {
         const validation =
@@ -301,7 +334,8 @@ async function handleRequest(
 
     if (
       request.method === 'POST' &&
-      projectRoute.action === 'profile'
+      projectRoute.action ===
+        'profile'
     ) {
       if (
         upload.status !== 'ready' ||
@@ -324,12 +358,12 @@ async function handleRequest(
         upload.label,
       );
 
-      scheduleJob(
+      scheduleProfileJob(
         job,
         upload.root,
         {
-          keepWorkspace: false,
-          projectNameOverride: upload.label,
+          projectNameOverride:
+            upload.label,
         },
         enqueue,
       );
@@ -345,352 +379,12 @@ async function handleRequest(
     }
   }
 
-  if (
-    request.method === 'POST' &&
-    url.pathname === '/api/jobs/path'
-  ) {
-    const payload = await readJsonBody(request);
-    const targetPath = String(payload.path ?? '').trim();
-
-    if (!targetPath) {
-      sendJson(
-        response,
-        400,
-        {
-          error: 'path is required.',
-        },
-      );
-      return;
-    }
-
-    const job = createJob(
-      jobs,
-      appRoot,
-      basename(targetPath) || 'Power BI project',
-    );
-
-    const keepWorkspace =
-      Boolean(payload.keepWorkspace);
-    const timeoutSeconds = boundedNumber(
-      payload.desktopTimeoutSeconds,
-      30,
-      1800,
-      300,
-    );
-
-    scheduleJob(
-      job,
-      targetPath,
-      {
-        keepWorkspace,
-        desktopTimeoutMs:
-          timeoutSeconds * 1000,
-      },
-      enqueue,
-    );
-
-    sendJson(
-      response,
-      202,
-      {
-        jobId: job.id,
-      },
-    );
-    return;
-  }
-
-  if (
-    request.method === 'POST' &&
-    url.pathname === '/api/jobs/pbix'
-  ) {
-    const originalName = decodeSafe(
-      request.headers['x-file-name'],
-    );
-    const safeName = sanitizePbixName(originalName);
-
-    if (!safeName) {
-      sendJson(
-        response,
-        400,
-        {
-          error:
-            'A valid .pbix file name is required.',
-        },
-      );
-      return;
-    }
-
-    const job = createJob(
-      jobs,
-      appRoot,
-      safeName,
-      'conversion',
-    );
-    const inputFile = join(
-      job.root,
-      safeName,
-    );
-
-    try {
-      await streamRequestToFile(
-        request,
-        inputFile,
-        MAX_UPLOAD_BYTES,
-      );
-    } catch (error) {
-      job.status = 'failed';
-      job.message =
-        error instanceof Error
-          ? error.message
-          : String(error);
-
-      sendJson(
-        response,
-        400,
-        {
-          error: job.message,
-        },
-      );
-      return;
-    }
-
-    const timeoutSeconds = boundedNumber(
-      url.searchParams.get('timeout'),
-      30,
-      1800,
-      300,
-    );
-
-    scheduleConversionJob(
-      job,
-      inputFile,
-      {
-        desktopTimeoutMs:
-          timeoutSeconds * 1000,
-      },
-      enqueue,
-    );
-
-    sendJson(
-      response,
-      202,
-      {
-        jobId: job.id,
-      },
-    );
-    return;
-  }
-
-  const workspaceRoute =
-    matchWorkspaceRoute(url.pathname);
-
-  if (workspaceRoute) {
-    const job = jobs.get(workspaceRoute.id);
-
-    if (!job) {
-      sendJson(
-        response,
-        404,
-        {
-          error: 'Job not found.',
-        },
-      );
-      return;
-    }
-
-    if (
-      job.kind !== 'conversion' ||
-      job.status !== 'converted' ||
-      !job.workspacePath
-    ) {
-      sendJson(
-        response,
-        409,
-        {
-          error:
-            'Converted PBIP workspace is not available for this job.',
-        },
-      );
-      return;
-    }
-
-    if (
-      request.method === 'POST' &&
-      workspaceRoute.action === 'export'
-    ) {
-      try {
-        const payload =
-          await readJsonBody(request);
-        const projectName =
-          String(job.label ?? '')
-            .replace(/\.pbix$/i, '');
-
-        const exported =
-          await exportWorkspaceToDirectory(
-            job.workspacePath,
-            payload.destinationRoot,
-            projectName,
-          );
-
-        let validation;
-        try {
-          const analyzed =
-            analyzeProject(exported.path);
-          validation =
-            assertAnalyzedProjectIsProfileable(
-              analyzed,
-              {
-                expected:
-                  job.conversion ?? null,
-                source:
-                  'Saved converted PBIP',
-              },
-            );
-        } catch (error) {
-          rmSync(
-            exported.path,
-            {
-              recursive: true,
-              force: true,
-            },
-          );
-          throw error;
-        }
-
-        removeWorkspace(
-          job.workspacePath,
-        );
-        job.workspacePath = null;
-        job.exportedPbipPath =
-          exported.path;
-        job.validation = validation;
-        job.status = 'ready';
-        job.message =
-          'Converted PBIP saved and validated. Ready to generate the runbook.';
-
-        sendJson(
-          response,
-          200,
-          {
-            ...exported,
-            validation,
-          },
-        );
-      } catch (error) {
-        sendJson(
-          response,
-          400,
-          {
-            error:
-              error instanceof Error
-                ? error.message
-                : String(error),
-          },
-        );
-      }
-      return;
-    }
-
-    if (
-      request.method === 'GET' &&
-      workspaceRoute.action === 'manifest'
-    ) {
-      const files = listWorkspaceFiles(
-        job.workspacePath,
-      );
-
-      sendJson(
-        response,
-        200,
-        {
-          projectName:
-            String(job.label ?? '')
-              .replace(/\.pbix$/i, ''),
-          files,
-          totalBytes:
-            files.reduce(
-              (sum, item) =>
-                sum + item.bytes,
-              0,
-            ),
-        },
-      );
-      return;
-    }
-
-    if (
-      request.method === 'GET' &&
-      workspaceRoute.action === 'file'
-    ) {
-      try {
-        const filePath =
-          resolveWorkspaceFile(
-            job.workspacePath,
-            url.searchParams.get('path'),
-          );
-
-        if (
-          !existsSync(filePath) ||
-          !statSync(filePath).isFile()
-        ) {
-          sendJson(
-            response,
-            404,
-            {
-              error:
-                'Converted PBIP file not found.',
-            },
-          );
-          return;
-        }
-
-        response.writeHead(
-          200,
-          securityHeaders({
-            'content-type':
-              'application/octet-stream',
-          }),
-        );
-        createReadStream(filePath).pipe(response);
-      } catch (error) {
-        sendJson(
-          response,
-          400,
-          {
-            error:
-              error instanceof Error
-                ? error.message
-                : String(error),
-          },
-        );
-      }
-      return;
-    }
-
-    if (
-      request.method === 'DELETE' &&
-      workspaceRoute.action === 'manifest'
-    ) {
-      removeWorkspace(
-        job.workspacePath,
-      );
-      job.workspacePath = null;
-
-      sendJson(
-        response,
-        200,
-        {
-          removed: true,
-        },
-      );
-      return;
-    }
-  }
-
-  const jobRoute = matchJobRoute(url.pathname);
+  const jobRoute =
+    matchJobRoute(url.pathname);
 
   if (jobRoute) {
-    const job = jobs.get(jobRoute.id);
+    const job =
+      jobs.get(jobRoute.id);
 
     if (!job) {
       sendJson(
@@ -716,62 +410,17 @@ async function handleRequest(
     }
 
     if (
-      request.method === 'POST' &&
-      jobRoute.resource === 'profile'
+      request.method === 'GET'
     ) {
       if (
-        job.kind !== 'conversion' ||
-        job.status !== 'ready' ||
-        !job.exportedPbipPath ||
-        !job.validation?.ready
+        job.status !== 'completed'
       ) {
         sendJson(
           response,
           409,
           {
             error:
-              'Converted PBIP must be saved and validated before profiling.',
-          },
-        );
-        return;
-      }
-
-      const profileJob = createJob(
-        jobs,
-        appRoot,
-        basename(job.exportedPbipPath),
-        'profile',
-      );
-
-      scheduleJob(
-        profileJob,
-        job.exportedPbipPath,
-        {
-          keepWorkspace: false,
-          projectNameOverride:
-            job.validation.projectName ??
-            basename(job.exportedPbipPath),
-        },
-        enqueue,
-      );
-
-      sendJson(
-        response,
-        202,
-        {
-          jobId: profileJob.id,
-        },
-      );
-      return;
-    }
-
-    if (request.method === 'GET') {
-      if (job.status !== 'completed') {
-        sendJson(
-          response,
-          409,
-          {
-            error: 'Job is not completed.',
+              'Job is not completed.',
           },
         );
         return;
@@ -780,12 +429,14 @@ async function handleRequest(
       const resource = {
         runbook: {
           path: job.outputs?.html,
-          contentType: 'text/html; charset=utf-8',
+          contentType:
+            'text/html; charset=utf-8',
           disposition: 'inline',
         },
         profile: {
           path: job.outputs?.json,
-          contentType: 'application/json; charset=utf-8',
+          contentType:
+            'application/json; charset=utf-8',
           disposition:
             'attachment; filename="profile.json"',
         },
@@ -798,12 +449,16 @@ async function handleRequest(
         },
       }[jobRoute.resource];
 
-      if (!resource?.path || !existsSync(resource.path)) {
+      if (
+        !resource?.path ||
+        !existsSync(resource.path)
+      ) {
         sendJson(
           response,
           404,
           {
-            error: 'Generated artifact not found.',
+            error:
+              'Generated artifact not found.',
           },
         );
         return;
@@ -812,12 +467,16 @@ async function handleRequest(
       response.writeHead(
         200,
         securityHeaders({
-          'content-type': resource.contentType,
+          'content-type':
+            resource.contentType,
           'content-disposition':
             resource.disposition,
         }),
       );
-      createReadStream(resource.path).pipe(response);
+
+      createReadStream(
+        resource.path,
+      ).pipe(response);
       return;
     }
   }
@@ -831,35 +490,118 @@ async function handleRequest(
   );
 }
 
+async function handlePbixOpen(
+  request,
+  response,
+  appRoot,
+) {
+  const originalName =
+    decodeSafe(
+      request.headers[
+        'x-file-name'
+      ],
+    );
+  const safeName =
+    sanitizePbixName(
+      originalName,
+    );
+
+  if (!safeName) {
+    sendJson(
+      response,
+      400,
+      {
+        error:
+          'A valid .pbix file name is required.',
+      },
+    );
+    return;
+  }
+
+  const stagingRoot = resolve(
+    appRoot,
+    'pbix',
+    randomUUID(),
+  );
+  const inputFile = join(
+    stagingRoot,
+    safeName,
+  );
+
+  try {
+    await streamRequestToFile(
+      request,
+      inputFile,
+      MAX_UPLOAD_BYTES,
+    );
+
+    const opened =
+      await openPbixInDesktop(
+        inputFile,
+      );
+
+    sendJson(
+      response,
+      200,
+      {
+        opened: true,
+        fileName: safeName,
+        processId:
+          opened.processId,
+        message:
+          'PBIX opened in Power BI Desktop. Use File > Save As and choose Power BI Project (.pbip).',
+      },
+    );
+  } catch (error) {
+    rmSync(
+      stagingRoot,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+
+    sendJson(
+      response,
+      400,
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+  }
+}
+
 function createJob(
   jobs,
   appRoot,
   label,
-  kind = 'profile',
 ) {
   const id = randomUUID();
   const root = resolve(
     appRoot,
+    'jobs',
     id,
   );
 
-  mkdirSync(root, {
-    recursive: true,
-  });
+  mkdirSync(
+    root,
+    {
+      recursive: true,
+    },
+  );
 
   const job = {
     id,
-    kind,
     label,
     root,
     status: 'queued',
-    message: 'Queued for local processing.',
+    message:
+      'Queued for local processing.',
     events: [],
     outputs: null,
-    workspacePath: null,
-    conversion: null,
-    validation: null,
-    exportedPbipPath: null,
     startedAt: null,
     completedAt: null,
   };
@@ -872,7 +614,7 @@ function createJob(
   return job;
 }
 
-function scheduleConversionJob(
+function scheduleProfileJob(
   job,
   targetPath,
   options,
@@ -885,104 +627,53 @@ function scheduleConversionJob(
 
     try {
       const result =
-        await convertPbixTarget(
+        await profileTarget(
           targetPath,
           {
-            desktopTimeoutMs:
-              options.desktopTimeoutMs ??
-              300_000,
+            outputDirectory:
+              join(
+                job.root,
+                'output',
+              ),
+            projectNameOverride:
+              options.projectNameOverride ??
+              null,
             onProgress(event) {
-              job.message = event.message;
+              job.message =
+                event.message;
               job.events.push({
                 phase: event.phase,
-                message: event.message,
+                message:
+                  event.message,
                 at:
                   new Date().toISOString(),
               });
 
-              if (job.events.length > 100) {
+              if (
+                job.events.length >
+                100
+              ) {
                 job.events.shift();
               }
             },
           },
         );
 
-      job.workspacePath =
-        result.workspacePath;
-      job.conversion =
-        result.conversion ?? null;
-      job.validation =
-        result.validation;
-      job.status = 'converted';
-      job.message =
-        'PBIX converted and validated. Save the PBIP to continue.';
-      job.completedAt =
-        new Date().toISOString();
-    } catch (error) {
-      job.status = 'failed';
-      job.message =
-        error instanceof Error
-          ? error.message
-          : String(error);
-      job.completedAt =
-        new Date().toISOString();
-    }
-  });
-}
-
-function scheduleJob(
-  job,
-  targetPath,
-  options,
-  enqueue,
-) {
-  enqueue(async () => {
-    job.status = 'running';
-    job.startedAt = new Date().toISOString();
-
-    try {
-      const result = await profileTarget(
-        targetPath,
-        {
-          outputDirectory: join(
-            job.root,
-            'output',
-          ),
-          keepWorkspace:
-            options.keepWorkspace ?? false,
-          desktopTimeoutMs:
-            options.desktopTimeoutMs ??
-            300_000,
-          projectNameOverride:
-            options.projectNameOverride ?? null,
-          onProgress(event) {
-            job.message = event.message;
-            job.events.push({
-              phase: event.phase,
-              message: event.message,
-              at: new Date().toISOString(),
-            });
-
-            if (job.events.length > 100) {
-              job.events.shift();
-            }
-          },
-        },
-      );
-
-      job.outputs = result.outputs;
-      job.workspacePath =
-        result.workspacePath ?? null;
+      job.outputs =
+        result.outputs;
       job.status = 'completed';
-      job.message = 'Runbook generated successfully.';
-      job.completedAt = new Date().toISOString();
+      job.message =
+        'Runbook generated successfully.';
+      job.completedAt =
+        new Date().toISOString();
     } catch (error) {
       job.status = 'failed';
       job.message =
         error instanceof Error
           ? error.message
           : String(error);
-      job.completedAt = new Date().toISOString();
+      job.completedAt =
+        new Date().toISOString();
     }
   });
 }
@@ -990,44 +681,19 @@ function scheduleJob(
 function publicJob(job) {
   return {
     id: job.id,
-    kind: job.kind,
     label: job.label,
     status: job.status,
     message: job.message,
     events: job.events,
-    workspaceAvailable:
-      Boolean(job.workspacePath),
-    exportedPbipPath:
-      job.exportedPbipPath ?? null,
-    validation:
-      job.validation ?? null,
     startedAt: job.startedAt,
-    completedAt: job.completedAt,
+    completedAt:
+      job.completedAt,
   };
 }
 
-function matchWorkspaceRoute(pathname) {
-  const match =
-    /^\/api\/jobs\/([^/]+)\/workspace(?:\/(file|export))?$/.exec(
-      pathname,
-    );
-
-  if (!match) {
-    return null;
-  }
-
-  return {
-    id: decodeURIComponent(match[1]),
-    action:
-      match[2] === 'file'
-        ? 'file'
-        : match[2] === 'export'
-          ? 'export'
-          : 'manifest',
-  };
-}
-
-function matchProjectRoute(pathname) {
+function matchProjectRoute(
+  pathname,
+) {
   const match =
     /^\/api\/projects\/([^/]+)\/(files|validate|profile)$/.exec(
       pathname,
@@ -1038,12 +704,17 @@ function matchProjectRoute(pathname) {
   }
 
   return {
-    id: decodeURIComponent(match[1]),
+    id:
+      decodeURIComponent(
+        match[1],
+      ),
     action: match[2],
   };
 }
 
-function matchJobRoute(pathname) {
+function matchJobRoute(
+  pathname,
+) {
   const match =
     /^\/api\/jobs\/([^/]+)(?:\/(runbook|profile|rag))?$/.exec(
       pathname,
@@ -1054,34 +725,59 @@ function matchJobRoute(pathname) {
   }
 
   return {
-    id: decodeURIComponent(match[1]),
-    resource: match[2] ?? 'status',
+    id:
+      decodeURIComponent(
+        match[1],
+      ),
+    resource:
+      match[2] ?? 'status',
   };
 }
 
-function authorized(request, url, token) {
+function authorized(
+  request,
+  url,
+  token,
+) {
   const header =
-    request.headers['x-pbi-profiling-token'];
+    request.headers[
+      'x-pbi-profiling-token'
+    ];
   const query =
-    url.searchParams.get('token');
+    url.searchParams.get(
+      'token',
+    );
 
-  return header === token || query === token;
+  return (
+    header === token ||
+    query === token
+  );
 }
 
-function securityHeaders(extra = {}) {
+function securityHeaders(
+  extra = {},
+) {
   return {
     'cache-control': 'no-store',
     'content-security-policy':
       "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'",
-    'cross-origin-resource-policy': 'same-origin',
-    'referrer-policy': 'no-referrer',
-    'x-content-type-options': 'nosniff',
-    'x-frame-options': 'DENY',
+    'cross-origin-resource-policy':
+      'same-origin',
+    'referrer-policy':
+      'no-referrer',
+    'x-content-type-options':
+      'nosniff',
+    'x-frame-options':
+      'DENY',
     ...extra,
   };
 }
 
-function sendHtml(response, status, html) {
+function sendHtml(
+  response,
+  status,
+  html,
+) {
   response.writeHead(
     status,
     securityHeaders({
@@ -1092,7 +788,11 @@ function sendHtml(response, status, html) {
   response.end(html);
 }
 
-function sendJson(response, status, value) {
+function sendJson(
+  response,
+  status,
+  value,
+) {
   if (response.headersSent) {
     response.end();
     return;
@@ -1105,19 +805,25 @@ function sendJson(response, status, value) {
         'application/json; charset=utf-8',
     }),
   );
+
   response.end(
     JSON.stringify(value),
   );
 }
 
-async function readJsonBody(request) {
+async function readJsonBody(
+  request,
+) {
   const chunks = [];
   let bytes = 0;
+  const limit = 64 * 1024;
 
-  for await (const chunk of request) {
+  for await (
+    const chunk of request
+  ) {
     bytes += chunk.length;
 
-    if (bytes > MAX_JSON_BYTES) {
+    if (bytes > limit) {
       throw new Error(
         'JSON request body is too large.',
       );
@@ -1126,13 +832,19 @@ async function readJsonBody(request) {
     chunks.push(chunk);
   }
 
-  const text = Buffer.concat(chunks).toString('utf-8');
+  const text =
+    Buffer.concat(
+      chunks,
+    ).toString('utf-8');
 
   try {
-    return JSON.parse(text || '{}');
+    return JSON.parse(
+      text || '{}',
+    );
   } catch (error) {
     throw new Error(
-      `Invalid JSON request: ${error.message}`,
+      'Invalid JSON request: ' +
+      error.message,
     );
   }
 }
@@ -1143,17 +855,27 @@ function streamRequestToFile(
   maxBytes,
 ) {
   return new Promise(
-    (resolvePromise, rejectPromise) => {
-      mkdirSync(dirname(destination), {
-        recursive: true,
-      });
+    (
+      resolvePromise,
+      rejectPromise,
+    ) => {
+      mkdirSync(
+        dirname(destination),
+        {
+          recursive: true,
+        },
+      );
 
       const declared = Number(
-        request.headers['content-length'] ?? 0,
+        request.headers[
+          'content-length'
+        ] ?? 0,
       );
 
       if (
-        Number.isFinite(declared) &&
+        Number.isFinite(
+          declared,
+        ) &&
         declared > maxBytes
       ) {
         rejectPromise(
@@ -1164,65 +886,101 @@ function streamRequestToFile(
         return;
       }
 
-      const output = createWriteStream(
-        destination,
-        {
-          flags: 'wx',
-        },
-      );
+      const output =
+        createWriteStream(
+          destination,
+          {
+            flags: 'wx',
+          },
+        );
+
       let bytes = 0;
       let failed = false;
 
-      const fail = (error) => {
+      const fail = (
+        error,
+      ) => {
         if (failed) {
           return;
         }
+
         failed = true;
         output.destroy();
+        rmSync(
+          destination,
+          {
+            force: true,
+          },
+        );
         rejectPromise(error);
       };
 
-      request.on('data', (chunk) => {
-        bytes += chunk.length;
+      request.on(
+        'data',
+        (chunk) => {
+          bytes += chunk.length;
 
-        if (bytes > maxBytes) {
-          request.destroy();
-          fail(
-            new Error(
-              'PBIX exceeds the local-app upload limit.',
-            ),
-          );
-        }
-      });
+          if (
+            bytes > maxBytes
+          ) {
+            request.destroy();
+            fail(
+              new Error(
+                'PBIX exceeds the local-app upload limit.',
+              ),
+            );
+          }
+        },
+      );
 
-      request.on('error', fail);
-      output.on('error', fail);
+      request.on(
+        'error',
+        fail,
+      );
+      output.on(
+        'error',
+        fail,
+      );
 
-      output.on('finish', () => {
-        if (!failed) {
-          resolvePromise();
-        }
-      });
+      output.on(
+        'finish',
+        () => {
+          if (!failed) {
+            resolvePromise();
+          }
+        },
+      );
 
       request.pipe(output);
     },
   );
 }
 
-function sanitizePbixName(value) {
-  const decoded = String(value ?? '').trim();
+function sanitizePbixName(
+  value,
+) {
+  const decoded =
+    String(
+      value ?? '',
+    ).trim();
 
   if (!decoded) {
     return null;
   }
 
-  const name = basename(decoded)
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
-    .trim();
+  const name =
+    basename(decoded)
+      .replace(
+        /[<>:"/\\|?*\u0000-\u001F]/g,
+        '_',
+      )
+      .trim();
 
   if (
     !name ||
-    !name.toLowerCase().endsWith('.pbix')
+    !name
+      .toLowerCase()
+      .endsWith('.pbix')
   ) {
     return null;
   }
@@ -1230,35 +988,20 @@ function sanitizePbixName(value) {
   return name;
 }
 
-function decodeSafe(value) {
-  if (typeof value !== 'string') {
+function decodeSafe(
+  value,
+) {
+  if (
+    typeof value !== 'string'
+  ) {
     return '';
   }
 
   try {
-    return decodeURIComponent(value);
+    return decodeURIComponent(
+      value,
+    );
   } catch {
     return value;
   }
-}
-
-function boundedNumber(
-  value,
-  minimum,
-  maximum,
-  fallback,
-) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-
-  return Math.max(
-    minimum,
-    Math.min(
-      maximum,
-      Math.round(parsed),
-    ),
-  );
 }

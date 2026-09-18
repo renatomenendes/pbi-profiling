@@ -10,8 +10,8 @@ export {
   prepareProfilingTarget,
 } from './intake/prepare.js';
 export {
-  convertPbixToPbip,
-} from './intake/pbix.js';
+  openPbixInDesktop,
+} from './intake/open-pbix.js';
 export {
   startLocalApp,
 } from './app/server.js';
