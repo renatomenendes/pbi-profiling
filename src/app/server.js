@@ -433,6 +433,13 @@ async function handleRequest(
             'text/html; charset=utf-8',
           disposition: 'inline',
         },
+        html: {
+          path: job.outputs?.html,
+          contentType:
+            'text/html; charset=utf-8',
+          disposition:
+            'attachment; filename="profile.html"',
+        },
         profile: {
           path: job.outputs?.json,
           contentType:
@@ -716,7 +723,7 @@ function matchJobRoute(
   pathname,
 ) {
   const match =
-    /^\/api\/jobs\/([^/]+)(?:\/(runbook|profile|rag))?$/.exec(
+    /^\/api\/jobs\/([^/]+)(?:\/(runbook|html|profile|rag))?$/.exec(
       pathname,
     );
 
