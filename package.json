@@ -1,7 +1,7 @@
 {
   "name": "pbi-profiling",
-  "version": "0.3.0",
-  "description": "Human-oriented profiling, documentation and analysis for Power BI PBIP projects.",
+  "version": "0.4.0",
+  "description": "Human-oriented profiling, documentation and analysis for Power BI PBIX and PBIP projects.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -12,6 +12,7 @@
   },
   "scripts": {
     "profile": "node ./src/cli.js",
+    "app": "node ./src/app.js",
     "test": "node ./scripts/test.js",
     "check": "node ./scripts/check.js"
   },
@@ -20,6 +21,7 @@
   },
   "keywords": [
     "power-bi",
+    "pbix",
     "pbip",
     "pbir",
     "tmdl",

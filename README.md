@@ -1,6 +1,6 @@
 # pbi-profiling
 
-Ferramenta read-only para profiling, discovery, auditoria e documentação de projetos Power BI em formato PBIP.
+Ferramenta read-only para profiling, discovery, auditoria e documentação de projetos Power BI a partir de PBIP e, no Windows, PBIX.
 
 O objetivo é transformar artefatos técnicos de Power BI em um runbook navegável para pessoas técnicas e não técnicas, preservando rastreabilidade até fontes, tabelas, colunas, medidas, páginas e visuais — no espírito de progressive disclosure de ferramentas de profiling como `pandas-profiling`, mas aplicado ao ecossistema PBIP.
 
@@ -51,6 +51,82 @@ O HTML inclui:
 - qualidade e cobertura;
 - manutenção e impacto de mudança;
 - detalhes técnicos sob demanda.
+
+## Entrada universal
+
+A partir da versão 0.4, o mesmo pipeline aceita diferentes pontos de entrada:
+
+- pasta de projeto PBIP;
+- arquivo `.pbip`;
+- pasta `.SemanticModel` ou `.Report`;
+- arquivo `.pbix` no Windows.
+
+PBIP é analisado diretamente. PBIX usa um workspace temporário local:
+
+```text
+PBIX
+  │
+  ├─ relatório PBIR embutido → extração local
+  └─ DataModel → Power BI Desktop já instalado
+                    │
+                    └─ Analysis Services local → TOM/TmdlSerializer
+  │
+  ▼
+PBIP/TMDL/PBIR temporário
+  │
+  ▼
+pbi-profiling
+```
+
+O arquivo PBIX original nunca é modificado. O workspace temporário é removido após a geração do HTML/JSON/RAG, salvo quando `--keep-workspace` é solicitado.
+
+A conversão do modelo não tenta reimplementar o backup `DataModel`: usa o serializador TMDL oficial exposto pelo TOM do Power BI Desktop. Isso preserva a fidelidade do modelo e evita dependências Python/.NET adicionais no projeto.
+
+### Limites atuais do intake PBIX
+
+O intake direto é deliberadamente conservador:
+
+- requer Windows e Power BI Desktop já instalado;
+- requer PBIX atual com `Report/definition/` PBIR embutido;
+- PBIX legado com apenas `Report/Layout` falha explicitamente em vez de fabricar uma tradução parcial;
+- thin reports/live connection sem modelo local falham explicitamente até que a resolução segura do semantic model remoto seja implementada;
+- o Power BI Desktop aberto para materializar o modelo fica aberto ao final; o profiler não fecha uma sessão do usuário sem identidade inequívoca.
+
+Exemplo:
+
+```powershell
+node .\src\cli.js profile `
+    "C:\caminho\Painel.pbix" `
+    --output ".\output\Painel"
+```
+
+Para preservar o PBIP temporário para auditoria:
+
+```powershell
+node .\src\cli.js profile `
+    "C:\caminho\Painel.pbix" `
+    --output ".\output\Painel" `
+    --keep-workspace
+```
+
+## Aplicação local
+
+Uma UI local zero-install está disponível sobre o mesmo pipeline do CLI:
+
+```powershell
+node .\src\app.js
+```
+
+O processo abre uma página em `127.0.0.1` com:
+
+- seletor de arquivo PBIX;
+- entrada de caminho para PBIP/SemanticModel/Report;
+- progresso do job;
+- abertura do runbook;
+- download local de `profile.json` e `profile.rag.jsonl`;
+- opção de preservar o PBIP temporário.
+
+A UI não usa CDN, telemetria ou serviços externos. Upload de PBIX significa apenas transferência do navegador para o servidor local em loopback; o arquivo fica em diretório temporário e é removido quando a aplicação encerra.
 
 ## Execução zero-install
 

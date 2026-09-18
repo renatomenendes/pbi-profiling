@@ -41,6 +41,25 @@ The current `pbi-profiling` page wireframe is an original implementation over PB
 
 Both local files carry provenance headers. No parser, HTML generator or lineage implementation from `pbi-semantic-doc` has been copied.
 
+
+### Horizun PBI MCP
+
+- Repository: https://github.com/HorizunGroup/horizun-pbi-mcp
+- Evaluated architecture: `pbip/pbix_to_pbip.py`, `pbip/pbix_reader.py`, `powerbi/tmdl_export.py`, and Power BI Desktop workspace discovery.
+- License: Apache-2.0.
+- Useful reference: split PBIX conversion into report extraction plus official TMDL serialization from the local Analysis Services model exposed by Power BI Desktop.
+
+The local implementation in `scripts/windows/convert-pbix.ps1` is an original PowerShell/Node implementation designed for the repository's zero-install constraint. It does not copy the Python implementation. The architectural decision to avoid decoding the compressed `DataModel` directly and instead use Microsoft's `TmdlSerializer` was validated against this project and is explicitly attributed here.
+
+### PBI Inspector
+
+- Repository: https://github.com/NatVanG/PBI-Inspector
+- Evaluated commit: `197f6637174861e7f0f866be728323943ceee2a0`
+- License: MIT.
+- Useful reference: local desktop workflow with PBIX/PBIP selection, temporary output and browser-oriented results.
+
+The `pbi-profiling` local UI is an original dependency-free HTTP/browser application. No WinForms or PBI Inspector source code is copied.
+
 ## Reference only — no code reuse
 
 ### pbir.tools
