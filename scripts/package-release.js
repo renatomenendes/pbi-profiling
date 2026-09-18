@@ -71,7 +71,6 @@ mkdirSync(
 
 const rootFiles = [
   'pbi-profiling.cmd',
-  'package.json',
   'README.md',
   'LICENSE',
   'ATTRIBUTIONS.md',
@@ -167,6 +166,28 @@ copyRequired(
   ),
 );
 
+const releasePackageJson = {
+  ...packageJson,
+  private: true,
+  scripts: {
+    app: 'node ./src/app.js',
+    profile: 'node ./src/cli.js',
+  },
+};
+
+writeFileSync(
+  join(
+    stageRoot,
+    'package.json',
+  ),
+  JSON.stringify(
+    releasePackageJson,
+    null,
+    2,
+  ) + '\n',
+  'utf-8',
+);
+
 const manifest = {
   product: 'pbi-profiling',
   version,
@@ -203,9 +224,8 @@ writeFileSync(
   'utf-8',
 );
 
-const forbidden = findForbidden(
-  stageRoot,
-);
+const forbidden =
+  findForbidden(stageRoot);
 
 if (forbidden.length > 0) {
   throw new Error(
@@ -215,6 +235,10 @@ if (forbidden.length > 0) {
 }
 
 for (const required of [
+  'pbi-profiling.cmd',
+  'package.json',
+  'LICENSE',
+  'RELEASE-MANIFEST.json',
   'src/app.js',
   'src/cli.js',
   'scripts/windows/open-pbix.ps1',
@@ -231,6 +255,36 @@ for (const required of [
         required,
     );
   }
+}
+
+const stagedPackage = JSON.parse(
+  readFileSync(
+    join(
+      stageRoot,
+      'package.json',
+    ),
+    'utf-8',
+  ),
+);
+
+if (
+  stagedPackage.version !==
+  version
+) {
+  throw new Error(
+    'Staged package version does not match the release version.',
+  );
+}
+
+if (
+  Object.keys(
+    stagedPackage.scripts ?? {},
+  ).sort().join(',') !==
+  'app,profile'
+) {
+  throw new Error(
+    'Portable package exposes unsupported development scripts.',
+  );
 }
 
 process.stdout.write(
