@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify release contract
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          test "${GITHUB_REF_NAME}" = "v${VERSION}"
+          test "$(node -p "require('./package.json').version")" = "${VERSION}"
+          test -f "docs/releases/${GITHUB_REF_NAME}.md"
+
+      - name: Run release quality gates
+        run: |
+          node ./scripts/check.js
+          node ./scripts/test.js
+          node ./src/cli.js --help
+
+      - name: Verify pinned upstream
+        run: |
+          test "$(git -C vendor/pbi-lineage-lenz rev-parse HEAD)" = "7e2c61cac2f5e0ca6e7135df17a6918c89c42aec"
+
+      - name: Build portable package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node ./scripts/package-release.js "${VERSION}"
+
+      - name: Create synthetic PBIP
+        env:
+          FIXTURE_DIR: ${{ runner.temp }}/release-fixture
+        run: |
+          node --input-type=module -e "import { writePbipFixture } from './test/fixtures/pbip.js'; writePbipFixture(process.env.FIXTURE_DIR);"
+
+      - name: Smoke test staged runtime
+        env:
+          FIXTURE_DIR: ${{ runner.temp }}/release-fixture
+          OUTPUT_DIR: ${{ runner.temp }}/staged-output
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_DIR="dist/pbi-profiling-v${VERSION}-windows-portable"
+
+          node "${PACKAGE_DIR}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
+
+          test -s "${OUTPUT_DIR}/profile.html"
+          test -s "${OUTPUT_DIR}/profile.json"
+          test -s "${OUTPUT_DIR}/profile.rag.jsonl"
+
+      - name: Create deterministic ZIP and checksum
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
+          PACKAGE_DIR="dist/${PACKAGE_BASENAME}"
+          ASSET="${PACKAGE_BASENAME}.zip"
+
+          mkdir -p release
+
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          find "${PACKAGE_DIR}" -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+
+          (
+            cd dist
+            find "${PACKAGE_BASENAME}" -type f -print |
+              LC_ALL=C sort |
+              zip -X -q "../release/${ASSET}" -@
+          )
+
+          sha256sum "release/${ASSET}" > release/SHA256SUMS.txt
+
+      - name: Smoke test ZIP artifact
+        env:
+          FIXTURE_DIR: ${{ runner.temp }}/release-fixture
+          OUTPUT_DIR: ${{ runner.temp }}/zip-output
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
+
+          mkdir -p "${RUNNER_TEMP}/release-unpacked"
+          unzip -q             "release/${PACKAGE_BASENAME}.zip"             -d "${RUNNER_TEMP}/release-unpacked"
+
+          PACKAGE_DIR="${RUNNER_TEMP}/release-unpacked/${PACKAGE_BASENAME}"
+
+          node "${PACKAGE_DIR}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
+
+          test -s "${OUTPUT_DIR}/profile.html"
+          test -s "${OUTPUT_DIR}/profile.json"
+          test -s "${OUTPUT_DIR}/profile.rag.jsonl"
+
+          if find "${PACKAGE_DIR}" -name .git -o -name node_modules -o -name coverage | grep -q .; then
+            echo "Forbidden development content found in final ZIP."
+            exit 1
+          fi
+
+      - name: Upload audited release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbi-profiling-${{ github.ref_name }}-release-assets
+          path: |
+            release/pbi-profiling-*-windows-portable.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ASSET="release/pbi-profiling-v${VERSION}-windows-portable.zip"
+
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+          gh release create "${GITHUB_REF_NAME}"             "${ASSET}"             release/SHA256SUMS.txt             --repo "${GITHUB_REPOSITORY}"             --title "pbi-profiling ${GITHUB_REF_NAME}"             --notes-file "docs/releases/${GITHUB_REF_NAME}.md"             --verify-tag
