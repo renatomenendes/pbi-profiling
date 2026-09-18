@@ -11,7 +11,10 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { shouldRead } from '../../vendor/pbi-lineage-lenz/packages/core/src/index.js';
-import { loadProject } from '../io/project.js';
+import { analyzeProject } from '../engine/analyze.js';
+import {
+  assertAnalyzedProjectIsProfileable,
+} from '../application/validation.js';
 
 export const MAX_PROJECT_FILE_BYTES =
   64 * 1024 * 1024;
@@ -147,20 +150,23 @@ export function validateBrowserProjectUpload(
     );
   }
 
-  const loaded = loadProject(
-    upload.root,
-  );
+  const analyzed =
+    analyzeProject(upload.root);
+  const structural =
+    assertAnalyzedProjectIsProfileable(
+      analyzed,
+      {
+        source:
+          'Selected PBIP project',
+      },
+    );
 
   const validation = {
-    ready: true,
+    ...structural,
     fileCount: upload.fileCount,
     totalBytes: upload.totalBytes,
-    modelName:
-      loaded.partition.modelName ?? null,
-    reportName:
-      loaded.partition.reportName ?? null,
     note:
-      loaded.note ?? null,
+      analyzed.note ?? null,
   };
 
   upload.status = 'ready';
