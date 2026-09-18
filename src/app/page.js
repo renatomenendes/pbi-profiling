@@ -408,13 +408,6 @@ export function renderAppPage() {
           </button>
         </div>
 
-        <div class="field inline">
-          <input id="pbix-keep" type="checkbox">
-          <label for="pbix-keep" style="margin:0">
-            Manter PBIP temporário para inspeção
-          </label>
-        </div>
-
         <div class="field">
           <label for="pbix-timeout">Timeout do Desktop (segundos)</label>
           <input
@@ -505,6 +498,9 @@ export function renderAppPage() {
         </a>
         <a id="download-json" class="button secondary">profile.json</a>
         <a id="download-rag" class="button secondary">profile.rag.jsonl</a>
+        <button id="export-pbip" class="button secondary" type="button" hidden>
+          Salvar PBIP convertido
+        </button>
       </div>
       <p id="workspace-note" class="muted" hidden></p>
     </section>
@@ -548,6 +544,7 @@ export function renderAppPage() {
       openRunbook: document.getElementById('open-runbook'),
       downloadJson: document.getElementById('download-json'),
       downloadRag: document.getElementById('download-rag'),
+      exportPbip: document.getElementById('export-pbip'),
       workspaceNote: document.getElementById('workspace-note'),
     };
 
@@ -572,11 +569,14 @@ export function renderAppPage() {
       elements.manualRun.disabled = busy;
       elements.pbixRun.disabled = busy || !selectedPbix;
       elements.projectRun.disabled = busy || !selectedProject;
+      elements.exportPbip.disabled = busy;
     }
 
     function showStatus(title, message) {
       elements.statusCard.classList.add('visible');
       elements.resultActions.hidden = true;
+      elements.exportPbip.hidden = true;
+      elements.exportPbip.dataset.jobId = '';
       elements.workspaceNote.hidden = true;
       elements.statusTitle.textContent = title || 'Processando';
       elements.statusPill.textContent = 'running';
@@ -1041,8 +1041,6 @@ export function renderAppPage() {
         return;
       }
 
-      const keepWorkspace =
-        document.getElementById('pbix-keep').checked;
       const timeout = Number(
         document.getElementById('pbix-timeout').value ||
         300,
@@ -1056,9 +1054,7 @@ export function renderAppPage() {
 
       try {
         const response = await fetch(
-          '/api/jobs/pbix?keepWorkspace=' +
-            (keepWorkspace ? '1' : '0') +
-            '&timeout=' +
+          '/api/jobs/pbix?keepWorkspace=1&timeout=' +
             encodeURIComponent(timeout),
           {
             method: 'POST',
@@ -1148,6 +1144,234 @@ export function renderAppPage() {
         pollJob(payload.jobId);
       } catch (error) {
         renderClientError(error);
+      }
+    }
+
+    async function createUniqueProjectDirectory(
+      parent,
+      projectName,
+    ) {
+      const base = sanitizeFolderName(
+        projectName + '-PBIP',
+      );
+
+      for (
+        let suffix = 1;
+        suffix <= 100;
+        suffix += 1
+      ) {
+        const name =
+          suffix === 1
+            ? base
+            : base + '-' + suffix;
+
+        try {
+          await parent.getDirectoryHandle(name);
+        } catch (error) {
+          if (
+            error &&
+            error.name === 'NotFoundError'
+          ) {
+            return await parent.getDirectoryHandle(
+              name,
+              {
+                create: true,
+              },
+            );
+          }
+          throw error;
+        }
+      }
+
+      throw new Error(
+        'Não foi possível criar uma pasta de destino exclusiva para o PBIP convertido.',
+      );
+    }
+
+    function sanitizeFolderName(value) {
+      const sanitized = String(value || 'PowerBI')
+        .replace(/[<>:"/\\|?*]/g, '_')
+        .replace(/[. ]+$/g, '')
+        .trim();
+
+      return sanitized || 'PowerBI';
+    }
+
+    async function getOutputFileHandle(
+      root,
+      relativePath,
+    ) {
+      const parts = normalizeBrowserPath(
+        relativePath,
+      ).split('/').filter(Boolean);
+
+      if (parts.length === 0) {
+        throw new Error(
+          'Arquivo convertido sem caminho relativo válido.',
+        );
+      }
+
+      let directory = root;
+
+      for (
+        let index = 0;
+        index < parts.length - 1;
+        index += 1
+      ) {
+        directory =
+          await directory.getDirectoryHandle(
+            parts[index],
+            {
+              create: true,
+            },
+          );
+      }
+
+      return await directory.getFileHandle(
+        parts[parts.length - 1],
+        {
+          create: true,
+        },
+      );
+    }
+
+    async function exportConvertedPbip() {
+      const jobId =
+        elements.exportPbip.dataset.jobId;
+
+      if (!jobId) {
+        return;
+      }
+
+      if (
+        typeof window.showDirectoryPicker !==
+        'function'
+      ) {
+        renderClientError(
+          new Error(
+            'Este navegador não permite gravar uma pasta PBIP diretamente. Use Microsoft Edge ou Chrome atualizados.',
+          ),
+        );
+        return;
+      }
+
+      let destination;
+
+      try {
+        destination =
+          await window.showDirectoryPicker({
+            id: 'pbi-profiling-export',
+            mode: 'readwrite',
+          });
+      } catch (error) {
+        if (
+          error &&
+          error.name === 'AbortError'
+        ) {
+          return;
+        }
+        renderClientError(error);
+        return;
+      }
+
+      setBusy(true);
+      elements.workspaceNote.hidden = false;
+      elements.workspaceNote.textContent =
+        'Preparando exportação do PBIP convertido...';
+
+      try {
+        const base =
+          '/api/jobs/' +
+          encodeURIComponent(jobId) +
+          '/workspace';
+
+        const manifestResponse =
+          await fetch(
+            base,
+            {
+              headers: apiHeaders(),
+            },
+          );
+
+        const manifest =
+          await readResponse(
+            manifestResponse,
+          );
+
+        const projectDirectory =
+          await createUniqueProjectDirectory(
+            destination,
+            manifest.projectName ||
+              'PowerBI',
+          );
+
+        let completed = 0;
+
+        for (const item of manifest.files) {
+          const response = await fetch(
+            base +
+              '/file?path=' +
+              encodeURIComponent(
+                item.path,
+              ),
+            {
+              headers: apiHeaders(),
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              'Falha ao ler o arquivo convertido: ' +
+                item.path,
+            );
+          }
+
+          const fileHandle =
+            await getOutputFileHandle(
+              projectDirectory,
+              item.path,
+            );
+          const writable =
+            await fileHandle.createWritable();
+
+          try {
+            await writable.write(
+              await response.arrayBuffer(),
+            );
+          } finally {
+            await writable.close();
+          }
+
+          completed += 1;
+          elements.workspaceNote.textContent =
+            'Salvando PBIP convertido: ' +
+            completed +
+            ' / ' +
+            manifest.files.length +
+            ' arquivos.';
+        }
+
+        await fetch(
+          base,
+          {
+            method: 'DELETE',
+            headers: apiHeaders(),
+          },
+        );
+
+        elements.workspaceNote.textContent =
+          'PBIP convertido salvo na pasta "' +
+          projectDirectory.name +
+          '".';
+        elements.exportPbip.hidden = true;
+        elements.exportPbip.dataset.jobId = '';
+      } catch (error) {
+        elements.workspaceNote.textContent =
+          error && error.message
+            ? error.message
+            : String(error);
+      } finally {
+        setBusy(false);
       }
     }
 
@@ -1248,10 +1472,12 @@ export function renderAppPage() {
           base + '/rag' + suffix;
         elements.resultActions.hidden = false;
 
-        if (job.workspacePath) {
+        if (job.workspaceAvailable) {
+          elements.exportPbip.hidden = false;
+          elements.exportPbip.dataset.jobId =
+            job.id;
           elements.workspaceNote.textContent =
-            'PBIP temporário preservado em: ' +
-            job.workspacePath;
+            'O PBIP convertido está disponível para salvar em uma pasta escolhida por você.';
           elements.workspaceNote.hidden = false;
         }
       }
@@ -1280,6 +1506,10 @@ export function renderAppPage() {
     elements.manualRun.addEventListener(
       'click',
       startManualPath,
+    );
+    elements.exportPbip.addEventListener(
+      'click',
+      exportConvertedPbip,
     );
 
     setBusy(false);
