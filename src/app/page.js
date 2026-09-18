@@ -633,6 +633,9 @@ export function renderAppPage() {
     }
 
     function renderJob(job) {
+      elements.resultActions.hidden = true;
+      elements.workspaceNote.hidden = true;
+
       elements.statusTitle.textContent =
         job.status === 'completed'
           ? 'Runbook gerado'

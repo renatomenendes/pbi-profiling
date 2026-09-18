@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -56,8 +56,14 @@ export async function selectLocalPowerBiTarget(
     'powershell.exe',
   );
 
+  const script = readFileSync(
+    PICKER_SCRIPT,
+    'utf-8',
+  );
+
   return await runPicker(
     powershell,
+    script,
     normalized,
     timeoutMs,
   );
@@ -65,6 +71,7 @@ export async function selectLocalPowerBiTarget(
 
 function runPicker(
   executable,
+  script,
   kind,
   timeoutMs,
 ) {
@@ -76,8 +83,8 @@ function runPicker(
           '-NoLogo',
           '-NoProfile',
           '-STA',
-          '-File',
-          PICKER_SCRIPT,
+          '-Command',
+          '-',
         ],
         {
           env: {
@@ -86,7 +93,7 @@ function runPicker(
           },
           windowsHide: false,
           stdio: [
-            'ignore',
+            'pipe',
             'pipe',
             'pipe',
           ],
@@ -114,6 +121,20 @@ function runPicker(
 
       child.stdout.setEncoding('utf-8');
       child.stderr.setEncoding('utf-8');
+
+      child.stdin.on('error', (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        clearTimeout(timer);
+        rejectPromise(
+          new Error(
+            `Could not send picker script to Windows PowerShell: ${error.message}`,
+          ),
+        );
+      });
 
       child.stdout.on('data', (chunk) => {
         stdout += chunk;
@@ -183,6 +204,8 @@ function runPicker(
           );
         }
       });
+
+      child.stdin.end(script);
     },
   );
 }
