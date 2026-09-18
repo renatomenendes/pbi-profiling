@@ -13,6 +13,13 @@ export function analyzeProject(targetPath) {
     reportFiles: partition.reportFiles ?? undefined,
   });
 
+  const modelPaths = [
+    ...partition.modelFiles.keys(),
+  ];
+  const reportPaths = [
+    ...(partition.reportFiles?.keys() ?? []),
+  ];
+
   const viewerModel = toViewerModel(analysis, {
     modelName: partition.modelName ?? loaded.projectName,
     reportName: partition.reportName ?? null,
@@ -26,6 +33,19 @@ export function analyzeProject(targetPath) {
     partition: {
       modelName: partition.modelName ?? null,
       reportName: partition.reportName ?? null,
+    },
+    inputSummary: {
+      modelFiles: partition.modelFiles.size,
+      tmdlFiles: modelPaths.filter(
+        (path) =>
+          path.toLowerCase().endsWith('.tmdl'),
+      ).length,
+      reportFiles:
+        partition.reportFiles?.size ?? 0,
+      reportJsonFiles: reportPaths.filter(
+        (path) =>
+          path.toLowerCase().endsWith('.json'),
+      ).length,
     },
     pageMetadata: extractPageMetadata(partition.reportFiles),
     analysis,
