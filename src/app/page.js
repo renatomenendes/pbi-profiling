@@ -1361,13 +1361,14 @@ export function renderAppPage() {
             ' arquivos.';
         }
 
-        await fetch(
+        const cleanupResponse = await fetch(
           base,
           {
             method: 'DELETE',
             headers: apiHeaders(),
           },
         );
+        await readResponse(cleanupResponse);
 
         elements.workspaceNote.textContent =
           'PBIP convertido salvo na pasta "' +
