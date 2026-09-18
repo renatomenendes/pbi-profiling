@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  exportWorkspaceToDirectory,
   listWorkspaceFiles,
   removeWorkspace,
   resolveWorkspaceFile,
@@ -146,4 +147,140 @@ test('converted workspace cleanup removes the temporary folder idempotently', ()
   assert.doesNotThrow(
     () => removeWorkspace(root),
   );
+});
+
+
+test('converted workspace export copies to a user path with collision-safe project folders', async () => {
+  const root = mkdtempSync(
+    join(
+      tmpdir(),
+      'pbi-profiling-workspace-source-',
+    ),
+  );
+  const destination = mkdtempSync(
+    join(
+      tmpdir(),
+      'pbi-profiling-workspace-destination-',
+    ),
+  );
+
+  try {
+    mkdirSync(
+      join(
+        root,
+        'Sample.SemanticModel',
+        'definition',
+      ),
+      {
+        recursive: true,
+      },
+    );
+
+    writeFileSync(
+      join(root, 'Sample.pbip'),
+      '{}',
+      'utf-8',
+    );
+    writeFileSync(
+      join(
+        root,
+        'Sample.SemanticModel',
+        'definition',
+        'model.tmdl',
+      ),
+      'model Model',
+      'utf-8',
+    );
+
+    const first =
+      await exportWorkspaceToDirectory(
+        root,
+        destination,
+        'Sample',
+      );
+
+    assert.equal(
+      first.path,
+      join(
+        destination,
+        'Sample-PBIP',
+      ),
+    );
+    assert.equal(
+      existsSync(
+        join(
+          first.path,
+          'Sample.SemanticModel',
+          'definition',
+          'model.tmdl',
+        ),
+      ),
+      true,
+    );
+
+    const second =
+      await exportWorkspaceToDirectory(
+        root,
+        destination,
+        'Sample',
+      );
+
+    assert.equal(
+      second.path,
+      join(
+        destination,
+        'Sample-PBIP-2',
+      ),
+    );
+  } finally {
+    rmSync(
+      root,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+    rmSync(
+      destination,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+  }
+});
+
+test('converted workspace export requires an absolute destination', async () => {
+  const root = mkdtempSync(
+    join(
+      tmpdir(),
+      'pbi-profiling-workspace-absolute-',
+    ),
+  );
+
+  try {
+    writeFileSync(
+      join(root, 'Sample.pbip'),
+      '{}',
+      'utf-8',
+    );
+
+    await assert.rejects(
+      () =>
+        exportWorkspaceToDirectory(
+          root,
+          'relative-output',
+          'Sample',
+        ),
+      /absolute path/i,
+    );
+  } finally {
+    rmSync(
+      root,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+  }
 });
