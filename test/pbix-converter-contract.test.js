@@ -130,3 +130,42 @@ test('PBIX model discovery combines live msmdsrv TCP listeners with workspace po
     /Discovery observed ports:/,
   );
 });
+
+
+test('PBIX converter proves TMDL files exist and round-trip through official TOM before success', () => {
+  const source = readFileSync(
+    resolve(
+      'scripts/windows/convert-pbix.ps1',
+    ),
+    'utf-8',
+  );
+
+  assert.match(
+    source,
+    /sourceTmdlFiles/,
+  );
+  assert.match(
+    source,
+    /DeserializeDatabaseFromFolder/,
+  );
+  assert.match(
+    source,
+    /TmdlSerializer returned without producing any \.tmdl files/i,
+  );
+  assert.match(
+    source,
+    /TMDL copy verification failed/i,
+  );
+  assert.match(
+    source,
+    /tmdl-source-validated/,
+  );
+  assert.match(
+    source,
+    /tmdl-destination-validated/,
+  );
+  assert.match(
+    source,
+    /TmdlFileCount/,
+  );
+});
