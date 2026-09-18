@@ -1,6 +1,6 @@
 # pbi-profiling
 
-Ferramenta read-only para profiling, discovery, auditoria e documentação de projetos Power BI a partir de PBIP e, no Windows, PBIX.
+Ferramenta read-only para profiling, discovery, auditoria e documentação de projetos Power BI a partir de PBIP. Quando a origem está em PBIX, a aplicação pode abrir o arquivo no Power BI Desktop para que o usuário o salve oficialmente como Power BI Project (.pbip) antes do profiling.
 
 O objetivo é transformar artefatos técnicos de Power BI em um runbook navegável para pessoas técnicas e não técnicas, preservando rastreabilidade até fontes, tabelas, colunas, medidas, páginas e visuais — no espírito de progressive disclosure de ferramentas de profiling como `pandas-profiling`, mas aplicado ao ecossistema PBIP.
 
@@ -52,88 +52,72 @@ O HTML inclui:
 - manutenção e impacto de mudança;
 - detalhes técnicos sob demanda.
 
-## Entrada universal
+## Contrato de entrada
 
-A partir da versão 0.4, o mesmo pipeline aceita diferentes pontos de entrada:
+O artefato de profiling é **PBIP**. O pipeline aceita:
 
-- pasta de projeto PBIP;
+- pasta raiz de projeto PBIP;
 - arquivo `.pbip`;
-- pasta `.SemanticModel` ou `.Report`;
-- arquivo `.pbix` no Windows.
+- pasta `.SemanticModel`;
+- pasta `.Report`.
 
-PBIP é analisado diretamente. PBIX usa um workspace temporário local:
+PBIX e PBIT não são convertidos pelo profiler. Quando a origem está em PBIX, o fluxo suportado é:
 
 ```text
 PBIX
   │
-  ├─ relatório PBIR embutido → extração local
-  └─ DataModel → Power BI Desktop já instalado
-                    │
-                    └─ Analysis Services local → TOM/TmdlSerializer
+  ▼
+Power BI Desktop
+  │
+  ├─ File > Save As
+  └─ Power BI Project (.pbip)
   │
   ▼
-PBIP/TMDL/PBIR temporário
+PBIP / TMDL / PBIR
+  │
+  ▼
+validação estrutural
   │
   ▼
 pbi-profiling
 ```
 
-O arquivo PBIX original nunca é modificado. O workspace temporário é removido após a geração do HTML/JSON/RAG, salvo quando `--keep-workspace` é solicitado.
+Essa separação é deliberada: o Power BI Desktop é o responsável por materializar o formato PBIP oficial; o `pbi-profiling` permanece responsável por validação, profiling, lineage, documentação e geração dos artefatos finais.
 
-A conversão do modelo não tenta reimplementar o backup `DataModel`: usa o serializador TMDL oficial exposto pelo TOM do Power BI Desktop. Isso preserva a fidelidade do modelo e evita dependências Python/.NET adicionais no projeto.
+Antes de gerar um runbook, o profiler exige um modelo semântico TMDL real e pelo menos uma tabela parseável. Um diretório com apenas metadados `.platform`, `definition.pbir` ou outros arquivos auxiliares não é aceito como projeto profileável.
 
-### Limites atuais do intake PBIX
-
-O intake direto é deliberadamente conservador:
-
-- requer Windows e Power BI Desktop já instalado;
-- requer PBIX atual com `Report/definition/` PBIR embutido;
-- PBIX legado com apenas `Report/Layout` falha explicitamente em vez de fabricar uma tradução parcial;
-- thin reports/live connection sem modelo local falham explicitamente até que a resolução segura do semantic model remoto seja implementada;
-- o Power BI Desktop aberto para materializar o modelo fica aberto ao final; o profiler não fecha uma sessão do usuário sem identidade inequívoca.
-
-Exemplo:
+Para uso via CLI, forneça um PBIP já salvo:
 
 ```powershell
 node .\src\cli.js profile `
-    "C:\caminho\Painel.pbix" `
-    --output ".\output\Painel"
-```
-
-Para preservar o PBIP temporário para auditoria:
-
-```powershell
-node .\src\cli.js profile `
-    "C:\caminho\Painel.pbix" `
-    --output ".\output\Painel" `
-    --keep-workspace
+    "C:\caminho\MeuProjetoPBIP" `
+    --output ".\output\MeuProjeto"
 ```
 
 ## Aplicação local
 
-Uma UI local zero-install está disponível sobre o mesmo pipeline do CLI:
+A UI local zero-install está disponível com:
 
 ```powershell
 node .\src\app.js
 ```
 
-O processo abre uma página em `127.0.0.1` com:
+O fluxo é explícito e sequencial:
 
-- seletor de PBIX do próprio navegador;
-- seleção de pasta PBIP por `showDirectoryPicker()` quando disponível;
-- fallback `webkitdirectory` para navegadores sem File System Access API;
-- pré-validação estrutural do PBIP antes de habilitar o profiling;
-- entrada manual de caminho como modo avançado;
-- progresso do job;
-- abertura do runbook;
-- download local de `profile.json` e `profile.rag.jsonl`;
-- opção de salvar o PBIP convertido em uma pasta escolhida pelo usuário.
+1. se a origem estiver em PBIX, selecione o arquivo e clique em **Abrir no Power BI Desktop**;
+2. no Desktop, use **File > Save As > Power BI Project (.pbip)**;
+3. volte à aplicação e clique em **Selecionar pasta PBIP**;
+4. a aplicação valida TMDL, tabelas, páginas e visuais;
+5. somente um PBIP válido habilita **Gerar runbook**;
+6. após o profiling concluído, ficam disponíveis **Abrir runbook**, `profile.json` e `profile.rag.jsonl`.
 
-A UI não usa CDN, telemetria, WinForms ou serviços externos. O navegador é responsável pela seleção de entrada; arquivos PBIX e os artefatos textuais relevantes do PBIP são enviados por streaming para o servidor local em loopback. PowerShell permanece restrito à conversão PBIX/TOM, onde o Power BI Desktop é tecnicamente necessário.
+Se o usuário já possui PBIP, começa diretamente no passo 3.
 
-O workspace de conversão PBIX continua temporário internamente e não é apresentado como destino de trabalho. Após uma conversão concluída, a UI oferece **Salvar PBIP convertido** com um campo de caminho local. A gravação não usa a File System Access API do navegador: o próprio servidor Node local copia o projeto para o caminho informado com as permissões normais do usuário. Isso evita bloqueios corporativos do Edge/Chromium para diretórios sensíveis ou para acesso de escrita. O navegador não expõe o caminho original do PBIX por segurança, portanto o usuário pode colar a pasta do projeto quando quiser salvar ao lado do arquivo original.
+O botão de PBIX não converte o arquivo. Ele apenas envia uma cópia local temporária ao servidor em `127.0.0.1` e abre essa cópia no Power BI Desktop instalado. A aplicação não usa TOM/TmdlSerializer para converter PBIX e não tenta reconstruir PBIP programaticamente.
 
-O destino padrão é `<home>\pbi-profiling\exports`. Dentro dele — ou do caminho informado pelo usuário — o profiler cria uma subpasta exclusiva como `<nome>-PBIP`, `<nome>-PBIP-2` etc., sem sobrescrever projetos existentes. Depois de uma exportação bem-sucedida, o workspace temporário é removido. Workspaces ainda não exportados também são removidos ao encerrar a aplicação local.
+A seleção de pasta PBIP usa `showDirectoryPicker()` quando disponível e `webkitdirectory` como fallback. O servidor reaplica o contrato de arquivos relevantes e valida estruturalmente o projeto antes do profiling.
+
+A UI não usa CDN, telemetria, WinForms, serviços externos, elevação, mudança de ExecutionPolicy ou instalação de pacotes.
 
 ## Execução zero-install
 
@@ -142,7 +126,7 @@ Requisitos de runtime:
 - Node.js 20 ou superior;
 - Git com suporte a submodules;
 - repositório clonado com o submodule pinado;
-- para intake PBIX: Windows e Power BI Desktop já instalado.
+- para o atalho **Abrir PBIX no Desktop**: Windows e Power BI Desktop já instalado.
 
 Não é necessário executar `npm install`, `npm ci`, `npm update` ou instalar qualquer pacote JavaScript na estação.
 
@@ -343,6 +327,6 @@ node .\scripts\check.js
 node .\scripts\test.js
 ```
 
-O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes, smoke test do CLI e parsing do adapter PBIX no Windows PowerShell 5.1.
+O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes, smoke test do CLI e parsing do launcher PBIX no Windows PowerShell 5.1.
 
 Os gates públicos usam somente fixtures sintéticas/open source; artefatos corporativos não são versionados neste repositório.
