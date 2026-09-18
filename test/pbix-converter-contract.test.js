@@ -62,7 +62,7 @@ test('PBIX converter refuses legacy report layout instead of fabricating PBIR', 
 });
 
 
-test('PBIX model detection correlates by new Analysis Services port, not workspace timestamp', () => {
+test('PBIX model detection correlates new Desktop model identity without relying on workspace timestamps alone', () => {
   const source = readFileSync(
     resolve(
       'scripts/windows/convert-pbix.ps1',
@@ -72,11 +72,19 @@ test('PBIX model detection correlates by new Analysis Services port, not workspa
 
   assert.match(
     source,
-    /PreviousPorts/,
+    /PreviousCandidates/,
   );
   assert.match(
     source,
-    /ContainsKey\(\[string\]\$_.Port\)/,
+    /Get-CandidateIdentity/,
+  );
+  assert.match(
+    source,
+    /isNewProcess/,
+  );
+  assert.match(
+    source,
+    /isRecentWorkspace/,
   );
   assert.doesNotMatch(
     source,
