@@ -22,6 +22,7 @@ import {
 import { profileTarget } from '../application/profile.js';
 import { renderAppPage } from './page.js';
 import { openBrowser } from './open.js';
+import { selectLocalPowerBiTarget } from './picker.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_JSON_BYTES = 64 * 1024;
@@ -160,6 +161,40 @@ async function handleRequest(
 
   if (
     request.method === 'POST' &&
+    url.pathname === '/api/picker'
+  ) {
+    const payload = await readJsonBody(request);
+    const kind = String(payload.kind ?? '').trim();
+
+    try {
+      const selected = await selectLocalPowerBiTarget(kind);
+      sendJson(
+        response,
+        200,
+        selected,
+      );
+    } catch (error) {
+      const status =
+        error?.code === 'PICKER_UNAVAILABLE'
+          ? 501
+          : 400;
+
+      sendJson(
+        response,
+        status,
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+    }
+    return;
+  }
+
+  if (
+    request.method === 'POST' &&
     url.pathname === '/api/jobs/path'
   ) {
     const payload = await readJsonBody(request);
@@ -182,11 +217,22 @@ async function handleRequest(
       basename(targetPath) || 'Power BI project',
     );
 
+    const keepWorkspace =
+      Boolean(payload.keepWorkspace);
+    const timeoutSeconds = boundedNumber(
+      payload.desktopTimeoutSeconds,
+      30,
+      1800,
+      300,
+    );
+
     scheduleJob(
       job,
       targetPath,
       {
-        keepWorkspace: false,
+        keepWorkspace,
+        desktopTimeoutMs:
+          timeoutSeconds * 1000,
       },
       enqueue,
     );
