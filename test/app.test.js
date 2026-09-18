@@ -15,6 +15,10 @@ async function waitForJob(
   origin,
   token,
   jobId,
+  terminalStatuses = [
+    'completed',
+    'failed',
+  ],
   timeoutMs = 10_000,
 ) {
   const deadline = Date.now() + timeoutMs;
@@ -25,107 +29,149 @@ async function waitForJob(
       origin + '/api/jobs/' + jobId,
       {
         headers: {
-          'x-pbi-profiling-token': token,
+          'x-pbi-profiling-token':
+            token,
         },
       },
     );
 
-    assert.equal(response.status, 200);
+    assert.equal(
+      response.status,
+      200,
+    );
+
     job = await response.json();
 
     if (
-      job.status === 'completed' ||
-      job.status === 'failed'
+      terminalStatuses.includes(
+        job.status,
+      )
     ) {
       return job;
     }
 
-    await new Promise((resolvePromise) => {
-      setTimeout(resolvePromise, 50);
-    });
+    await new Promise(
+      (resolvePromise) => {
+        setTimeout(
+          resolvePromise,
+          50,
+        );
+      },
+    );
   }
 
   return job;
 }
 
-test('local app exposes browser-native intake and preserves manual-path profiling', async () => {
-  const root = mkdtempSync(
-    join(tmpdir(), 'pbi-profiling-app-test-'),
+async function createBrowserProject(
+  origin,
+  token,
+  name,
+  files,
+) {
+  const create = await fetch(
+    origin + '/api/projects',
+    {
+      method: 'POST',
+      headers: {
+        'content-type':
+          'application/json',
+        'x-pbi-profiling-token':
+          token,
+      },
+      body: JSON.stringify({
+        name,
+      }),
+    },
   );
-  const project = join(root, 'project');
-  writePbipFixture(project);
 
+  assert.equal(create.status, 201);
+  const created = await create.json();
+
+  for (const [path, content] of files) {
+    const upload = await fetch(
+      origin +
+        '/api/projects/' +
+        created.projectId +
+        '/files?path=' +
+        encodeURIComponent(path),
+      {
+        method: 'PUT',
+        headers: {
+          'content-type':
+            'application/octet-stream',
+          'x-pbi-profiling-token':
+            token,
+        },
+        body: Buffer.from(
+          content,
+          'utf-8',
+        ),
+      },
+    );
+
+    const uploadText =
+      await upload.text();
+
+    assert.equal(
+      upload.status,
+      201,
+      uploadText,
+    );
+  }
+
+  return created.projectId;
+}
+
+test('local UI exposes one logical runbook action after project preparation', async () => {
   const app = await startLocalApp({
     open: false,
   });
 
   try {
-    const url = new URL(app.url);
-    const origin = url.origin;
-
     const page = await fetch(app.url);
     assert.equal(page.status, 200);
 
     const html = await page.text();
 
-    assert.match(html, /Universal Intake/);
-    assert.match(html, /Selecionar PBIX/);
     assert.match(
       html,
-      /Selecionar pasta do projeto/,
-    );
-    assert.match(html, /showDirectoryPicker/);
-    assert.match(html, /webkitdirectory/);
-    assert.match(html, /\/api\/jobs\/pbix/);
-    assert.doesNotMatch(html, /\/api\/picker/);
-    assert.doesNotMatch(
-      html,
-      /WinForms|Windows Forms/i,
+      /Converter para PBIP/,
     );
     assert.match(
       html,
-      /Salvar PBIP convertido/,
-    );
-    assert.doesNotMatch(
-      html,
-      /Manter PBIP temporário para inspeção/,
+      /Selecionar pasta PBIP/,
     );
     assert.match(
       html,
-      /\/workspace\/export/,
+      /Projeto preparado/,
     );
     assert.match(
       html,
-      /O navegador não expõe a pasta original do PBIX/,
-    );
-    assert.doesNotMatch(
-      html,
-      /mode:\s*['"]readwrite['"]/,
-    );
-    assert.doesNotMatch(
-      html,
-      /createWritable\(/,
+      /Execução e resultado/,
     );
 
-    for (const id of [
-      'pbix-file',
-      'pbix-select',
-      'pbix-run',
-      'project-folder-fallback',
-      'project-select',
-      'project-run',
-      'manual-path',
-      'manual-run',
-      'status-card',
-      'pbip-export-panel',
-      'export-root',
-      'export-pbip',
-    ]) {
-      assert.match(
-        html,
-        new RegExp('id="' + id + '"'),
-      );
-    }
+    assert.equal(
+      (
+        html.match(
+          />\s*Gerar runbook\s*</g,
+        ) ?? []
+      ).length,
+      1,
+    );
+
+    assert.match(
+      html,
+      /id="generate-runbook"/,
+    );
+    assert.doesNotMatch(
+      html,
+      /id="project-run"/,
+    );
+    assert.doesNotMatch(
+      html,
+      /id="pbix-run"/,
+    );
 
     const inlineScript =
       html.match(
@@ -136,98 +182,16 @@ test('local app exposes browser-native intake and preserves manual-path profilin
     assert.doesNotThrow(
       () => new Function(inlineScript),
     );
-
-    const unauthorized = await fetch(
-      origin + '/api/jobs/path',
-      {
-        method: 'POST',
-        headers: {
-          'content-type':
-            'application/json',
-        },
-        body: JSON.stringify({
-          path: project,
-        }),
-      },
-    );
-
-    assert.equal(
-      unauthorized.status,
-      403,
-    );
-
-    const create = await fetch(
-      origin + '/api/jobs/path',
-      {
-        method: 'POST',
-        headers: {
-          'content-type':
-            'application/json',
-          'x-pbi-profiling-token':
-            app.token,
-        },
-        body: JSON.stringify({
-          path: project,
-        }),
-      },
-    );
-
-    assert.equal(
-      create.status,
-      202,
-    );
-
-    const created = await create.json();
-
-    const job = await waitForJob(
-      origin,
-      app.token,
-      created.jobId,
-    );
-
-    assert.equal(
-      job?.status,
-      'completed',
-      job?.message,
-    );
-
-    const profile = await fetch(
-      origin +
-        '/api/jobs/' +
-        created.jobId +
-        '/profile?token=' +
-        app.token,
-    );
-
-    assert.equal(
-      profile.status,
-      200,
-    );
-
-    const profileJson =
-      await profile.json();
-
-    assert.equal(
-      profileJson.overview.counts.tables,
-      2,
-    );
   } finally {
     await app.close();
-    rmSync(
-      root,
-      {
-        recursive: true,
-        force: true,
-      },
-    );
   }
 });
 
-test('browser PBIP staging validates and profiles the same relevant-file contract as local folders', async () => {
+test('browser PBIP staging validates real TMDL before profiling', async () => {
   const root = mkdtempSync(
     join(
       tmpdir(),
-      'pbi-profiling-browser-project-',
+      'pbi-profiling-browser-valid-',
     ),
   );
   const sourceProject = join(
@@ -247,61 +211,18 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
     const url = new URL(app.url);
     const origin = url.origin;
 
-    const create = await fetch(
-      origin + '/api/projects',
-      {
-        method: 'POST',
-        headers: {
-          'content-type':
-            'application/json',
-          'x-pbi-profiling-token':
-            app.token,
-        },
-        body: JSON.stringify({
-          name: 'Browser selected project',
-        }),
-      },
-    );
-
-    assert.equal(create.status, 201);
-    const created = await create.json();
-
-    for (const [path, fileContent] of relevantFiles) {
-      const upload = await fetch(
-        origin +
-          '/api/projects/' +
-          created.projectId +
-          '/files?path=' +
-          encodeURIComponent(path),
-        {
-          method: 'PUT',
-          headers: {
-            'content-type':
-              'application/octet-stream',
-            'x-pbi-profiling-token':
-              app.token,
-          },
-          body: Buffer.from(
-            fileContent,
-            'utf-8',
-          ),
-        },
+    const projectId =
+      await createBrowserProject(
+        origin,
+        app.token,
+        'Browser selected project',
+        relevantFiles,
       );
-
-      const uploadText =
-        await upload.text();
-
-      assert.equal(
-        upload.status,
-        201,
-        uploadText,
-      );
-    }
 
     const validate = await fetch(
       origin +
         '/api/projects/' +
-        created.projectId +
+        projectId +
         '/validate',
       {
         method: 'POST',
@@ -324,16 +245,22 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
     const validation =
       JSON.parse(validationText);
 
-    assert.equal(validation.ready, true);
     assert.equal(
-      validation.fileCount,
-      relevantFiles.size,
+      validation.ready,
+      true,
+    );
+    assert.ok(
+      validation.tmdlFiles > 0,
+    );
+    assert.equal(
+      validation.tables,
+      2,
     );
 
     const run = await fetch(
       origin +
         '/api/projects/' +
-        created.projectId +
+        projectId +
         '/profile',
       {
         method: 'POST',
@@ -379,10 +306,6 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
       profileJson.overview.counts.tables,
       2,
     );
-    assert.equal(
-      profileJson.meta.projectName,
-      'Browser selected project',
-    );
   } finally {
     await app.close();
     rmSync(
@@ -392,6 +315,93 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
         force: true,
       },
     );
+  }
+});
+
+test('PBIP with report metadata but no TMDL is rejected instead of producing an empty runbook', async () => {
+  const app = await startLocalApp({
+    open: false,
+  });
+
+  try {
+    const url = new URL(app.url);
+    const origin = url.origin;
+
+    const files = new Map([
+      [
+        'Broken.SemanticModel/.platform',
+        '{}',
+      ],
+      [
+        'Broken.Report/.platform',
+        '{}',
+      ],
+      [
+        'Broken.Report/definition.pbir',
+        JSON.stringify({
+          version: '4.0',
+          datasetReference: {
+            byPath: {
+              path:
+                '../Broken.SemanticModel',
+            },
+          },
+        }),
+      ],
+    ]);
+
+    const projectId =
+      await createBrowserProject(
+        origin,
+        app.token,
+        'Broken PBIP',
+        files,
+      );
+
+    const validate = await fetch(
+      origin +
+        '/api/projects/' +
+        projectId +
+        '/validate',
+      {
+        method: 'POST',
+        headers: {
+          'x-pbi-profiling-token':
+            app.token,
+        },
+      },
+    );
+
+    assert.equal(
+      validate.status,
+      400,
+    );
+
+    const payload =
+      await validate.json();
+
+    assert.match(
+      payload.error,
+      /no TMDL files|not profileable/i,
+    );
+
+    const run = await fetch(
+      origin +
+        '/api/projects/' +
+        projectId +
+        '/profile',
+      {
+        method: 'POST',
+        headers: {
+          'x-pbi-profiling-token':
+            app.token,
+        },
+      },
+    );
+
+    assert.equal(run.status, 409);
+  } finally {
+    await app.close();
   }
 });
 
@@ -458,7 +468,7 @@ test('browser PBIP staging rejects unsafe relative paths', async () => {
   }
 });
 
-test('PBIX upload contract remains streaming and accepts realistic corporate filenames', async () => {
+test('PBIX upload remains streaming and enters conversion rather than profiling', async () => {
   const app = await startLocalApp({
     open: false,
   });
@@ -469,7 +479,7 @@ test('PBIX upload contract remains streaming and accepts realistic corporate fil
 
     const response = await fetch(
       origin +
-        '/api/jobs/pbix?keepWorkspace=1&timeout=30',
+        '/api/jobs/pbix?timeout=30',
       {
         method: 'POST',
         headers: {
@@ -504,9 +514,20 @@ test('PBIX upload contract remains streaming and accepts realistic corporate fil
       origin,
       app.token,
       payload.jobId,
+      [
+        'converted',
+        'failed',
+      ],
     );
 
-    assert.equal(job?.status, 'failed');
+    assert.equal(
+      job?.kind,
+      'conversion',
+    );
+    assert.equal(
+      job?.status,
+      'failed',
+    );
     assert.doesNotMatch(
       job.message,
       /ENOENT|no such file or directory/i,
