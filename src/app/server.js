@@ -2,6 +2,7 @@ import {
   createReadStream,
   createWriteStream,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   rmSync,
 } from 'node:fs';
@@ -9,6 +10,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import {
   basename,
+  dirname,
   join,
   resolve,
 } from 'node:path';
@@ -384,6 +386,10 @@ function createJob(jobs, appRoot, label) {
     id,
   );
 
+  mkdirSync(root, {
+    recursive: true,
+  });
+
   const job = {
     id,
     label,
@@ -574,6 +580,10 @@ function streamRequestToFile(
 ) {
   return new Promise(
     (resolvePromise, rejectPromise) => {
+      mkdirSync(dirname(destination), {
+        recursive: true,
+      });
+
       const declared = Number(
         request.headers['content-length'] ?? 0,
       );
