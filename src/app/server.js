@@ -24,6 +24,11 @@ import {
 } from 'node:crypto';
 
 import { profileTarget } from '../application/profile.js';
+import { convertPbixTarget } from '../application/convert.js';
+import {
+  assertAnalyzedProjectIsProfileable,
+} from '../application/validation.js';
+import { analyzeProject } from '../engine/analyze.js';
 import { renderAppPage } from './page.js';
 import { openBrowser } from './open.js';
 import {
@@ -419,6 +424,7 @@ async function handleRequest(
       jobs,
       appRoot,
       safeName,
+      'conversion',
     );
     const inputFile = join(
       job.root,
@@ -448,8 +454,6 @@ async function handleRequest(
       return;
     }
 
-    const keepWorkspace =
-      url.searchParams.get('keepWorkspace') === '1';
     const timeoutSeconds = boundedNumber(
       url.searchParams.get('timeout'),
       30,
@@ -457,11 +461,10 @@ async function handleRequest(
       300,
     );
 
-    scheduleJob(
+    scheduleConversionJob(
       job,
       inputFile,
       {
-        keepWorkspace,
         desktopTimeoutMs:
           timeoutSeconds * 1000,
       },
@@ -496,7 +499,8 @@ async function handleRequest(
     }
 
     if (
-      job.status !== 'completed' ||
+      job.kind !== 'conversion' ||
+      job.status !== 'converted' ||
       !job.workspacePath
     ) {
       sendJson(
@@ -528,18 +532,48 @@ async function handleRequest(
             projectName,
           );
 
+        let validation;
+        try {
+          const analyzed =
+            analyzeProject(exported.path);
+          validation =
+            assertAnalyzedProjectIsProfileable(
+              analyzed,
+              {
+                expected:
+                  job.conversion ?? null,
+                source:
+                  'Saved converted PBIP',
+              },
+            );
+        } catch (error) {
+          rmSync(
+            exported.path,
+            {
+              recursive: true,
+              force: true,
+            },
+          );
+          throw error;
+        }
+
         removeWorkspace(
           job.workspacePath,
         );
         job.workspacePath = null;
         job.exportedPbipPath =
           exported.path;
+        job.validation = validation;
+        job.status = 'ready';
+        job.message =
+          'Converted PBIP saved and validated. Ready to generate the runbook.';
 
         sendJson(
           response,
           200,
           {
             ...exported,
+            validation,
           },
         );
       } catch (error) {
@@ -681,6 +715,56 @@ async function handleRequest(
       return;
     }
 
+    if (
+      request.method === 'POST' &&
+      jobRoute.resource === 'profile'
+    ) {
+      if (
+        job.kind !== 'conversion' ||
+        job.status !== 'ready' ||
+        !job.exportedPbipPath ||
+        !job.validation?.ready
+      ) {
+        sendJson(
+          response,
+          409,
+          {
+            error:
+              'Converted PBIP must be saved and validated before profiling.',
+          },
+        );
+        return;
+      }
+
+      const profileJob = createJob(
+        jobs,
+        appRoot,
+        basename(job.exportedPbipPath),
+        'profile',
+      );
+
+      scheduleJob(
+        profileJob,
+        job.exportedPbipPath,
+        {
+          keepWorkspace: false,
+          projectNameOverride:
+            job.validation.projectName ??
+            basename(job.exportedPbipPath),
+        },
+        enqueue,
+      );
+
+      sendJson(
+        response,
+        202,
+        {
+          jobId: profileJob.id,
+        },
+      );
+      return;
+    }
+
     if (request.method === 'GET') {
       if (job.status !== 'completed') {
         sendJson(
@@ -747,7 +831,12 @@ async function handleRequest(
   );
 }
 
-function createJob(jobs, appRoot, label) {
+function createJob(
+  jobs,
+  appRoot,
+  label,
+  kind = 'profile',
+) {
   const id = randomUUID();
   const root = resolve(
     appRoot,
@@ -760,6 +849,7 @@ function createJob(jobs, appRoot, label) {
 
   const job = {
     id,
+    kind,
     label,
     root,
     status: 'queued',
@@ -767,6 +857,9 @@ function createJob(jobs, appRoot, label) {
     events: [],
     outputs: null,
     workspacePath: null,
+    conversion: null,
+    validation: null,
+    exportedPbipPath: null,
     startedAt: null,
     completedAt: null,
   };
@@ -777,6 +870,64 @@ function createJob(jobs, appRoot, label) {
   );
 
   return job;
+}
+
+function scheduleConversionJob(
+  job,
+  targetPath,
+  options,
+  enqueue,
+) {
+  enqueue(async () => {
+    job.status = 'running';
+    job.startedAt =
+      new Date().toISOString();
+
+    try {
+      const result =
+        await convertPbixTarget(
+          targetPath,
+          {
+            desktopTimeoutMs:
+              options.desktopTimeoutMs ??
+              300_000,
+            onProgress(event) {
+              job.message = event.message;
+              job.events.push({
+                phase: event.phase,
+                message: event.message,
+                at:
+                  new Date().toISOString(),
+              });
+
+              if (job.events.length > 100) {
+                job.events.shift();
+              }
+            },
+          },
+        );
+
+      job.workspacePath =
+        result.workspacePath;
+      job.conversion =
+        result.conversion ?? null;
+      job.validation =
+        result.validation;
+      job.status = 'converted';
+      job.message =
+        'PBIX converted and validated. Save the PBIP to continue.';
+      job.completedAt =
+        new Date().toISOString();
+    } catch (error) {
+      job.status = 'failed';
+      job.message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+      job.completedAt =
+        new Date().toISOString();
+    }
+  });
 }
 
 function scheduleJob(
@@ -839,6 +990,7 @@ function scheduleJob(
 function publicJob(job) {
   return {
     id: job.id,
+    kind: job.kind,
     label: job.label,
     status: job.status,
     message: job.message,
@@ -847,6 +999,8 @@ function publicJob(job) {
       Boolean(job.workspacePath),
     exportedPbipPath:
       job.exportedPbipPath ?? null,
+    validation:
+      job.validation ?? null,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
   };
