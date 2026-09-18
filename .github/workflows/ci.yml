@@ -81,7 +81,7 @@ jobs:
 
             if ($errors.Count -gt 0) {
               $errors | ForEach-Object {
-                Write-Error "$script: $($_.Message)"
+                Write-Error "${script}: $($_.Message)"
               }
               exit 1
             }
