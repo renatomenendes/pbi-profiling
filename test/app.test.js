@@ -90,6 +90,22 @@ test('local app exposes browser-native intake and preserves manual-path profilin
       html,
       /Manter PBIP temporário para inspeção/,
     );
+    assert.match(
+      html,
+      /\/workspace\/export/,
+    );
+    assert.match(
+      html,
+      /O navegador não expõe a pasta original do PBIX/,
+    );
+    assert.doesNotMatch(
+      html,
+      /mode:\s*['"]readwrite['"]/,
+    );
+    assert.doesNotMatch(
+      html,
+      /createWritable\(/,
+    );
 
     for (const id of [
       'pbix-file',
@@ -101,6 +117,8 @@ test('local app exposes browser-native intake and preserves manual-path profilin
       'manual-path',
       'manual-run',
       'status-card',
+      'pbip-export-panel',
+      'export-root',
       'export-pbip',
     ]) {
       assert.match(
