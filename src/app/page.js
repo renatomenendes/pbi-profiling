@@ -332,9 +332,9 @@ export function renderAppPage() {
       <div class="eyebrow">Power BI · Universal Intake</div>
       <h1>pbi-profiling</h1>
       <p>
-        Selecione um PBIX ou informe um projeto PBIP existente. O processamento
-        ocorre localmente, gera um runbook autocontido e não envia o arquivo
-        para serviços externos.
+        Selecione um PBIX, um arquivo PBIP ou uma pasta de projeto. O
+        processamento ocorre localmente, gera um runbook autocontido e não
+        envia artefatos para serviços externos.
       </p>
     </header>
 
@@ -347,8 +347,18 @@ export function renderAppPage() {
         </p>
 
         <div class="field">
-          <label for="pbix-file">Arquivo PBIX</label>
-          <input id="pbix-file" type="file" accept=".pbix">
+          <label for="pbix-path">Arquivo PBIX</label>
+          <input
+            id="pbix-path"
+            type="text"
+            autocomplete="off"
+            placeholder="Nenhum PBIX selecionado"
+            readonly
+          >
+        </div>
+
+        <div class="actions">
+          <button id="pbix-select" class="secondary" type="button">Selecionar PBIX</button>
         </div>
 
         <div class="field inline">
@@ -384,23 +394,36 @@ export function renderAppPage() {
         </div>
 
         <div class="actions">
+          <button id="project-select-file" class="secondary" type="button">Selecionar .pbip</button>
+          <button id="project-select-folder" class="secondary" type="button">Selecionar pasta</button>
           <button id="path-run" type="button">Analisar projeto</button>
         </div>
 
         <p class="muted" style="margin-top:16px">
-          O navegador não recebe permissão para enumerar seu disco. Por isso,
-          projetos em pasta são informados por caminho; PBIX usa o seletor de
-          arquivo e upload apenas para localhost.
+          No Windows, os botões abrem o seletor nativo do sistema. O caminho
+          também pode ser digitado diretamente quando necessário.
         </p>
       </section>
     </div>
 
     <div class="privacy">
-      O servidor escuta somente em <strong>127.0.0.1</strong>. PBIX enviados
-      pela tela são gravados em diretório temporário local e removidos quando
-      o aplicativo encerra. Nenhuma CDN, telemetria ou chamada de rede é usada
-      pelo frontend.
+      O servidor escuta somente em <strong>127.0.0.1</strong>. A seleção de
+      arquivos e pastas usa o próprio Windows; o pipeline trabalha diretamente
+      com o caminho local. Nenhuma CDN, telemetria ou chamada externa de rede é
+      usada pelo frontend.
     </div>
+
+    <dialog id="project-choice">
+      <form method="dialog" class="card" style="min-width:min(440px,90vw)">
+        <h2>Selecionar projeto</h2>
+        <p>Escolha o tipo de entrada que deseja analisar.</p>
+        <div class="actions">
+          <button id="dialog-select-pbip" type="button">Arquivo .pbip</button>
+          <button id="dialog-select-folder" type="button">Pasta do projeto</button>
+          <button class="secondary" value="cancel">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
 
     <section id="status-card" class="card status-card">
       <div class="status-line">
@@ -435,7 +458,13 @@ export function renderAppPage() {
       downloadRag: document.getElementById('download-rag'),
       workspaceNote: document.getElementById('workspace-note'),
       pbixRun: document.getElementById('pbix-run'),
+      pbixSelect: document.getElementById('pbix-select'),
       pathRun: document.getElementById('path-run'),
+      projectSelectFile: document.getElementById('project-select-file'),
+      projectSelectFolder: document.getElementById('project-select-folder'),
+      projectChoice: document.getElementById('project-choice'),
+      dialogSelectPbip: document.getElementById('dialog-select-pbip'),
+      dialogSelectFolder: document.getElementById('dialog-select-folder'),
     };
 
     let polling = null;
@@ -449,7 +478,10 @@ export function renderAppPage() {
 
     function setBusy(busy) {
       elements.pbixRun.disabled = busy;
+      elements.pbixSelect.disabled = busy;
       elements.pathRun.disabled = busy;
+      elements.projectSelectFile.disabled = busy;
+      elements.projectSelectFolder.disabled = busy;
     }
 
     function showStatus() {
@@ -461,12 +493,13 @@ export function renderAppPage() {
     }
 
     async function startPbix() {
-      const fileInput = document.getElementById('pbix-file');
-      const file = fileInput.files?.[0];
+      let path = document.getElementById('pbix-path').value.trim();
 
-      if (!file) {
-        alert('Selecione um arquivo .pbix.');
-        return;
+      if (!path) {
+        path = await pickTarget('pbix', 'pbix-path');
+        if (!path) {
+          return;
+        }
       }
 
       const keepWorkspace = document.getElementById('pbix-keep').checked;
@@ -474,22 +507,21 @@ export function renderAppPage() {
 
       setBusy(true);
       showStatus();
-      elements.statusTitle.textContent = 'Enviando PBIX';
-      elements.statusMessage.textContent = 'Copiando o arquivo somente para o servidor local.';
+      elements.statusTitle.textContent = 'Preparando PBIX';
+      elements.statusMessage.textContent = 'Abrindo o PBIX diretamente do caminho local selecionado.';
 
       try {
-        const response = await fetch(
-          '/api/jobs/pbix?keepWorkspace=' + (keepWorkspace ? '1' : '0') +
-            '&timeout=' + encodeURIComponent(timeout),
-          {
-            method: 'POST',
-            headers: apiHeaders({
-              'content-type': 'application/octet-stream',
-              'x-file-name': encodeURIComponent(file.name),
-            }),
-            body: file,
-          },
-        );
+        const response = await fetch('/api/jobs/path', {
+          method: 'POST',
+          headers: apiHeaders({
+            'content-type': 'application/json',
+          }),
+          body: JSON.stringify({
+            path,
+            keepWorkspace,
+            desktopTimeoutSeconds: timeout,
+          }),
+        });
 
         const payload = await readResponse(response);
         pollJob(payload.jobId);
@@ -502,7 +534,7 @@ export function renderAppPage() {
       const path = document.getElementById('project-path').value.trim();
 
       if (!path) {
-        alert('Informe o caminho do projeto PBIP.');
+        elements.projectChoice.showModal();
         return;
       }
 
@@ -523,6 +555,43 @@ export function renderAppPage() {
       } catch (error) {
         renderClientError(error);
       }
+    }
+
+    async function pickTarget(kind, inputId) {
+      try {
+        const response = await fetch('/api/picker', {
+          method: 'POST',
+          headers: apiHeaders({
+            'content-type': 'application/json',
+          }),
+          body: JSON.stringify({ kind }),
+        });
+
+        const payload = await readResponse(response);
+
+        if (payload.cancelled || !payload.path) {
+          return '';
+        }
+
+        document.getElementById(inputId).value = payload.path;
+        return payload.path;
+      } catch (error) {
+        renderClientError(error);
+        return '';
+      }
+    }
+
+    async function selectProjectAndRun(kind) {
+      const path = await pickTarget(kind, 'project-path');
+      if (!path) {
+        return;
+      }
+
+      if (elements.projectChoice.open) {
+        elements.projectChoice.close();
+      }
+
+      await startPath();
     }
 
     async function readResponse(response) {
@@ -626,8 +695,28 @@ export function renderAppPage() {
       setBusy(false);
     }
 
+    elements.pbixSelect.addEventListener(
+      'click',
+      () => pickTarget('pbix', 'pbix-path'),
+    );
     elements.pbixRun.addEventListener('click', startPbix);
+    elements.projectSelectFile.addEventListener(
+      'click',
+      () => pickTarget('pbip', 'project-path'),
+    );
+    elements.projectSelectFolder.addEventListener(
+      'click',
+      () => pickTarget('folder', 'project-path'),
+    );
     elements.pathRun.addEventListener('click', startPath);
+    elements.dialogSelectPbip.addEventListener(
+      'click',
+      () => selectProjectAndRun('pbip'),
+    );
+    elements.dialogSelectFolder.addEventListener(
+      'click',
+      () => selectProjectAndRun('folder'),
+    );
   </script>
 </body>
 </html>`;
