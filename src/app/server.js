@@ -513,7 +513,8 @@ async function handleRequest(
         200,
         {
           projectName:
-            basename(job.label, '.pbix'),
+            String(job.label ?? '')
+              .replace(/\.pbix$/i, ''),
           files,
           totalBytes:
             files.reduce(
