@@ -161,6 +161,10 @@ test('local UI enforces PBIX open, Desktop save-as-PBIP, then one runbook action
     );
     assert.match(
       html,
+      /Exportar HTML/,
+    );
+    assert.match(
+      html,
       /PBIT não é a entrada do profiler/,
     );
 
@@ -344,6 +348,40 @@ test('browser-selected PBIP validates real TMDL before profiling', async () => {
         .counts
         .tables,
       2,
+    );
+
+    const exportedHtml =
+      await fetch(
+        origin +
+          '/api/jobs/' +
+          started.jobId +
+          '/html?token=' +
+          app.token,
+      );
+
+    assert.equal(
+      exportedHtml.status,
+      200,
+    );
+    assert.match(
+      exportedHtml.headers.get(
+        'content-type',
+      ) ?? '',
+      /text\/html/i,
+    );
+    assert.equal(
+      exportedHtml.headers.get(
+        'content-disposition',
+      ),
+      'attachment; filename="profile.html"',
+    );
+
+    const exportedHtmlText =
+      await exportedHtml.text();
+
+    assert.match(
+      exportedHtmlText,
+      /PBI Profiling/,
     );
   } finally {
     await app.close();
