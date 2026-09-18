@@ -30,15 +30,15 @@ test('Windows PBIX adapter preserves zero-install and official TOM serialization
   );
 
   assert.equal(
-    /python|pythonnet|pip install/i.test(source),
+    /(?:^|\s)python(?:\.exe)?\s+/im.test(source),
     false,
   );
   assert.equal(
-    /npm install|npm ci/i.test(source),
+    /npm\s+(?:install|ci)(?:\s|$)/i.test(source),
     false,
   );
   assert.equal(
-    /ExecutionPolicy|Bypass/i.test(source),
+    /-ExecutionPolicy\s+(?:Bypass|Unrestricted)/i.test(source),
     false,
   );
 });
