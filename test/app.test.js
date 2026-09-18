@@ -113,6 +113,38 @@ test('local app exposes browser-native intake and preserves manual-path profilin
       /WinForms|Windows Forms/i,
     );
 
+    const inlineScript =
+      html.match(
+        /<script>([\s\S]*?)<\/script>/,
+      )?.[1];
+
+    assert.ok(inlineScript);
+    assert.doesNotThrow(
+      () => new Function(inlineScript),
+    );
+
+    for (
+      const match of
+      inlineScript.matchAll(
+        /getElementById\('([^']+)'\)/g,
+      )
+    ) {
+      assert.match(
+        html,
+        new RegExp(
+          'id="' +
+          match[1].replace(
+            /[.*+?^$\{\}()|[\]\\]/g,
+            '\\    assert.doesNotMatch(
+      html,
+      /WinForms|Windows Forms/i,
+    );',
+          ) +
+          '"',
+        ),
+      );
+    }
+
     const unauthorized = await fetch(
       origin + '/api/jobs/path',
       {
@@ -187,6 +219,10 @@ test('local app exposes browser-native intake and preserves manual-path profilin
     assert.equal(
       profileJson.overview.counts.tables,
       2,
+    );
+    assert.equal(
+      profileJson.meta.projectName,
+      'Browser selected project',
     );
   } finally {
     await app.close();
