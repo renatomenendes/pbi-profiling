@@ -291,14 +291,17 @@ test('browser PBIP staging validates and profiles the same relevant-file contrac
       },
     );
 
+    const validationText =
+      await validate.text();
+
     assert.equal(
       validate.status,
       200,
-      await validate.text(),
+      validationText,
     );
 
     const validation =
-      await validate.json();
+      JSON.parse(validationText);
 
     assert.equal(
       validation.ready,
