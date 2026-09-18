@@ -46,7 +46,7 @@ test('native Windows picker supports PBIX, PBIP and project folders without inst
   );
 });
 
-test('Node picker launches Windows PowerShell in STA and never exposes arbitrary picker kinds', () => {
+test('Node picker uses stdin PowerShell execution in STA without ExecutionPolicy bypass and never exposes arbitrary picker kinds', () => {
   const source = readFileSync(
     resolve(
       'src/app/picker.js',
@@ -57,6 +57,26 @@ test('Node picker launches Windows PowerShell in STA and never exposes arbitrary
   assert.match(
     source,
     /'-STA'/,
+  );
+  assert.match(
+    source,
+    /'-Command'/,
+  );
+  assert.match(
+    source,
+    /child\.stdin\.end\(script\)/,
+  );
+  assert.match(
+    source,
+    /readFileSync/,
+  );
+  assert.doesNotMatch(
+    source,
+    /'-File'/,
+  );
+  assert.doesNotMatch(
+    source,
+    /-ExecutionPolicy/,
   );
   assert.match(
     source,
