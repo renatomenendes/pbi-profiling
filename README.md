@@ -119,14 +119,16 @@ node .\src\app.js
 
 O processo abre uma página em `127.0.0.1` com:
 
-- seletor de arquivo PBIX;
-- entrada de caminho para PBIP/SemanticModel/Report;
+- seletor nativo do Windows para PBIX;
+- seletor nativo para arquivo `.pbip`;
+- seletor nativo para pasta PBIP/`.SemanticModel`/`.Report`;
+- entrada manual de caminho como alternativa;
 - progresso do job;
 - abertura do runbook;
 - download local de `profile.json` e `profile.rag.jsonl`;
 - opção de preservar o PBIP temporário.
 
-A UI não usa CDN, telemetria ou serviços externos. Upload de PBIX significa apenas transferência do navegador para o servidor local em loopback; o arquivo fica em diretório temporário e é removido quando a aplicação encerra.
+A UI não usa CDN, telemetria ou serviços externos. No Windows, a seleção é feita por diálogos nativos e o pipeline recebe o caminho local diretamente; um PBIX grande não é copiado pelo navegador para o próprio servidor local. A rota de upload permanece apenas como compatibilidade técnica do servidor.
 
 ## Execução zero-install
 
@@ -134,7 +136,8 @@ Requisitos de runtime:
 
 - Node.js 20 ou superior;
 - Git com suporte a submodules;
-- repositório clonado com o submodule pinado.
+- repositório clonado com o submodule pinado;
+- para intake PBIX: Windows e Power BI Desktop já instalado.
 
 Não é necessário executar `npm install`, `npm ci`, `npm update` ou instalar qualquer pacote JavaScript na estação.
 
@@ -335,6 +338,6 @@ node .\scripts\check.js
 node .\scripts\test.js
 ```
 
-O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes e smoke test do CLI.
+O CI valida Node.js 20, 22 e 24, o commit pinado do upstream, ausência de `node_modules`, ausência de dependências npm no pacote, sintaxe, suíte de testes, smoke test do CLI e parsing dos adapters Windows no Windows PowerShell 5.1.
 
 Os gates públicos usam somente fixtures sintéticas/open source; artefatos corporativos não são versionados neste repositório.
