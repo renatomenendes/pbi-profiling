@@ -12,6 +12,9 @@ import { prepareProfilingTarget } from '../intake/prepare.js';
 import { buildProfile } from '../profile/build.js';
 import { renderEnhancedReportHtml } from '../report/enhance.js';
 import { renderLineageHtml } from '../report/lineage.js';
+import {
+  assertAnalyzedProjectIsProfileable,
+} from './validation.js';
 
 export async function profileTarget(
   targetPath,
@@ -45,6 +48,18 @@ export async function profileTarget(
     });
 
     const result = analyzeProject(prepared.projectRoot);
+    assertAnalyzedProjectIsProfileable(
+      result,
+      {
+        expected:
+          prepared.conversion ?? null,
+        source:
+          prepared.converted
+            ? 'Converted PBIP'
+            : 'PBIP project',
+      },
+    );
+
     result.projectName =
       String(projectNameOverride ?? '').trim() ||
       prepared.projectName ||
