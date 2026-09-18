@@ -87,3 +87,38 @@ test('PBIX model detection correlates by new Analysis Services port, not workspa
     /No manual Save As is required/i,
   );
 });
+
+
+test('PBIX model discovery combines live msmdsrv TCP listeners with workspace port files', () => {
+  const source = readFileSync(
+    resolve(
+      'scripts/windows/convert-pbix.ps1',
+    ),
+    'utf-8',
+  );
+
+  assert.match(
+    source,
+    /function Get-ProcessPorts/,
+  );
+  assert.match(
+    source,
+    /Get-Process -Name msmdsrv/,
+  );
+  assert.match(
+    source,
+    /netstat\.exe.*-ano.*-p tcp/s,
+  );
+  assert.match(
+    source,
+    /function Get-DesktopModelCandidates/,
+  );
+  assert.match(
+    source,
+    /process\+workspace/,
+  );
+  assert.match(
+    source,
+    /Discovery observed ports:/,
+  );
+});
