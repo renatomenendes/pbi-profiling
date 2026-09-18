@@ -472,6 +472,9 @@ export function renderAppPage() {
           <a id="open-runbook" class="button" target="_blank" rel="noopener">
             Abrir runbook
           </a>
+          <a id="export-html" class="button secondary" download="profile.html">
+            Exportar HTML
+          </a>
           <a id="download-json" class="button secondary">profile.json</a>
           <a id="download-rag" class="button secondary">profile.rag.jsonl</a>
         </div>
@@ -521,6 +524,7 @@ export function renderAppPage() {
       events: document.getElementById('events'),
       resultActions: document.getElementById('result-actions'),
       openRunbook: document.getElementById('open-runbook'),
+      exportHtml: document.getElementById('export-html'),
       downloadJson: document.getElementById('download-json'),
       downloadRag: document.getElementById('download-rag'),
     };
@@ -1152,6 +1156,8 @@ export function renderAppPage() {
 
           elements.openRunbook.href =
             base + '/runbook' + suffix;
+          elements.exportHtml.href =
+            base + '/html' + suffix;
           elements.downloadJson.href =
             base + '/profile' + suffix;
           elements.downloadRag.href =
