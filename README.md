@@ -129,9 +129,11 @@ O processo abre uma página em `127.0.0.1` com:
 - download local de `profile.json` e `profile.rag.jsonl`;
 - opção de salvar o PBIP convertido em uma pasta escolhida pelo usuário.
 
-A UI não usa CDN, telemetria, WinForms ou serviços externos. O navegador é responsável apenas pela seleção; arquivos PBIX e os artefatos textuais relevantes do PBIP são enviados por streaming para o servidor local em loopback. PowerShell permanece restrito à conversão PBIX/TOM, onde o Power BI Desktop é tecnicamente necessário.
+A UI não usa CDN, telemetria, WinForms ou serviços externos. O navegador é responsável pela seleção de entrada; arquivos PBIX e os artefatos textuais relevantes do PBIP são enviados por streaming para o servidor local em loopback. PowerShell permanece restrito à conversão PBIX/TOM, onde o Power BI Desktop é tecnicamente necessário.
 
-O workspace de conversão PBIX continua temporário internamente e não é apresentado como destino de trabalho. Após uma conversão concluída, a UI oferece **Salvar PBIP convertido**. O usuário escolhe qualquer pasta normal do Windows — inclusive a mesma pasta do PBIX original — e o navegador grava uma subpasta exclusiva como `<nome>-PBIP`, preservando todos os arquivos convertidos. Depois de uma exportação bem-sucedida, o workspace temporário é removido. Workspaces ainda não exportados também são removidos ao encerrar a aplicação local.
+O workspace de conversão PBIX continua temporário internamente e não é apresentado como destino de trabalho. Após uma conversão concluída, a UI oferece **Salvar PBIP convertido** com um campo de caminho local. A gravação não usa a File System Access API do navegador: o próprio servidor Node local copia o projeto para o caminho informado com as permissões normais do usuário. Isso evita bloqueios corporativos do Edge/Chromium para diretórios sensíveis ou para acesso de escrita. O navegador não expõe o caminho original do PBIX por segurança, portanto o usuário pode colar a pasta do projeto quando quiser salvar ao lado do arquivo original.
+
+O destino padrão é `<home>\pbi-profiling\exports`. Dentro dele — ou do caminho informado pelo usuário — o profiler cria uma subpasta exclusiva como `<nome>-PBIP`, `<nome>-PBIP-2` etc., sem sobrescrever projetos existentes. Depois de uma exportação bem-sucedida, o workspace temporário é removido. Workspaces ainda não exportados também são removidos ao encerrar a aplicação local.
 
 ## Execução zero-install
 

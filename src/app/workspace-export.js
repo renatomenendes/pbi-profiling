@@ -1,9 +1,12 @@
 import {
+  existsSync,
   readdirSync,
   rmSync,
   statSync,
 } from 'node:fs';
+import { cp, mkdir } from 'node:fs/promises';
 import {
+  isAbsolute,
   resolve,
   sep,
 } from 'node:path';
@@ -67,14 +70,96 @@ export function listWorkspaceFiles(
   );
 }
 
+export async function exportWorkspaceToDirectory(
+  workspaceRoot,
+  destinationRoot,
+  projectName,
+) {
+  const source = resolve(workspaceRoot);
+  const requestedDestination =
+    String(destinationRoot ?? '').trim();
+
+  if (!requestedDestination) {
+    throw new Error(
+      'A destination directory is required to save the converted PBIP.',
+    );
+  }
+
+  if (!isAbsolute(requestedDestination)) {
+    throw new Error(
+      'The converted PBIP destination must be an absolute path.',
+    );
+  }
+
+  const base = resolve(
+    requestedDestination,
+  );
+
+  const sourcePrefix =
+    source.endsWith(sep)
+      ? source
+      : `${source}${sep}`;
+
+  if (
+    source === base ||
+    base.startsWith(sourcePrefix)
+  ) {
+    throw new Error(
+      'The converted PBIP destination cannot be inside the temporary conversion workspace.',
+    );
+  }
+
+  await mkdir(
+    base,
+    {
+      recursive: true,
+    },
+  );
+
+  const safeProjectName =
+    sanitizeFolderName(projectName);
+  const target =
+    await copyWorkspaceToUniqueTarget(
+      source,
+      base,
+      `${safeProjectName}-PBIP`,
+    );
+
+  const files =
+    listWorkspaceFiles(target);
+
+  if (files.length === 0) {
+    rmSync(
+      target,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+    throw new Error(
+      'The converted PBIP export completed without files.',
+    );
+  }
+
+  return {
+    path: target,
+    fileCount: files.length,
+    totalBytes:
+      files.reduce(
+        (sum, item) =>
+          sum + item.bytes,
+        0,
+      ),
+  };
+}
+
 export function resolveWorkspaceFile(
   root,
   relativePath,
 ) {
   const workspaceRoot = resolve(root);
-  const normalized = normalizeRelativePath(
-    relativePath,
-  );
+  const normalized =
+    normalizeRelativePath(relativePath);
   const destination = resolve(
     workspaceRoot,
     ...normalized.split('/'),
@@ -103,6 +188,78 @@ export function removeWorkspace(
       force: true,
     },
   );
+}
+
+async function copyWorkspaceToUniqueTarget(
+  source,
+  parent,
+  baseName,
+) {
+  for (
+    let suffix = 1;
+    suffix <= 10_000;
+    suffix += 1
+  ) {
+    const folderName =
+      suffix === 1
+        ? baseName
+        : `${baseName}-${suffix}`;
+    const candidate = resolve(
+      parent,
+      folderName,
+    );
+
+    if (existsSync(candidate)) {
+      continue;
+    }
+
+    try {
+      await cp(
+        source,
+        candidate,
+        {
+          recursive: true,
+          errorOnExist: true,
+          force: false,
+        },
+      );
+      return candidate;
+    } catch (error) {
+      rmSync(
+        candidate,
+        {
+          recursive: true,
+          force: true,
+        },
+      );
+
+      if (
+        error?.code === 'EEXIST' ||
+        error?.code === 'ERR_FS_CP_EEXIST'
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error(
+    'Could not allocate a unique destination folder for the converted PBIP.',
+  );
+}
+
+function sanitizeFolderName(
+  value,
+) {
+  const sanitized = String(
+    value ?? 'PowerBI',
+  )
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .trim();
+
+  return sanitized || 'PowerBI';
 }
 
 function normalizeRelativePath(

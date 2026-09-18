@@ -8,7 +8,10 @@ import {
   statSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
+import {
+  homedir,
+  tmpdir,
+} from 'node:os';
 import {
   basename,
   dirname,
@@ -29,6 +32,7 @@ import {
   validateBrowserProjectUpload,
 } from './project-upload.js';
 import {
+  exportWorkspaceToDirectory,
   listWorkspaceFiles,
   removeWorkspace,
   resolveWorkspaceFile,
@@ -163,7 +167,13 @@ async function handleRequest(
     sendHtml(
       response,
       200,
-      renderAppPage(),
+      renderAppPage({
+        defaultExportRoot: join(
+          homedir(),
+          'pbi-profiling',
+          'exports',
+        ),
+      }),
     );
     return;
   }
@@ -501,6 +511,53 @@ async function handleRequest(
     }
 
     if (
+      request.method === 'POST' &&
+      workspaceRoute.action === 'export'
+    ) {
+      try {
+        const payload =
+          await readJsonBody(request);
+        const projectName =
+          String(job.label ?? '')
+            .replace(/\.pbix$/i, '');
+
+        const exported =
+          await exportWorkspaceToDirectory(
+            job.workspacePath,
+            payload.destinationRoot,
+            projectName,
+          );
+
+        removeWorkspace(
+          job.workspacePath,
+        );
+        job.workspacePath = null;
+        job.exportedPbipPath =
+          exported.path;
+
+        sendJson(
+          response,
+          200,
+          {
+            ...exported,
+          },
+        );
+      } catch (error) {
+        sendJson(
+          response,
+          400,
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+        );
+      }
+      return;
+    }
+
+    if (
       request.method === 'GET' &&
       workspaceRoute.action === 'manifest'
     ) {
@@ -788,6 +845,8 @@ function publicJob(job) {
     events: job.events,
     workspaceAvailable:
       Boolean(job.workspacePath),
+    exportedPbipPath:
+      job.exportedPbipPath ?? null,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
   };
@@ -795,7 +854,7 @@ function publicJob(job) {
 
 function matchWorkspaceRoute(pathname) {
   const match =
-    /^\/api\/jobs\/([^/]+)\/workspace(?:\/(file))?$/.exec(
+    /^\/api\/jobs\/([^/]+)\/workspace(?:\/(file|export))?$/.exec(
       pathname,
     );
 
@@ -808,7 +867,9 @@ function matchWorkspaceRoute(pathname) {
     action:
       match[2] === 'file'
         ? 'file'
-        : 'manifest',
+        : match[2] === 'export'
+          ? 'export'
+          : 'manifest',
   };
 }
 
