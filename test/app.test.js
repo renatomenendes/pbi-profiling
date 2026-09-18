@@ -82,6 +82,14 @@ test('local app exposes browser-native intake and preserves manual-path profilin
       html,
       /WinForms|Windows Forms/i,
     );
+    assert.match(
+      html,
+      /Salvar PBIP convertido/,
+    );
+    assert.doesNotMatch(
+      html,
+      /Manter PBIP temporário para inspeção/,
+    );
 
     for (const id of [
       'pbix-file',
@@ -93,6 +101,7 @@ test('local app exposes browser-native intake and preserves manual-path profilin
       'manual-path',
       'manual-run',
       'status-card',
+      'export-pbip',
     ]) {
       assert.match(
         html,

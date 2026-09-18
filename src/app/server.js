@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
+  statSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -27,6 +28,11 @@ import {
   receiveBrowserProjectFile,
   validateBrowserProjectUpload,
 } from './project-upload.js';
+import {
+  listWorkspaceFiles,
+  removeWorkspace,
+  resolveWorkspaceFile,
+} from './workspace-export.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_JSON_BYTES = 64 * 1024;
@@ -118,6 +124,13 @@ export async function startLocalApp(
       await new Promise((resolvePromise) => {
         server.close(() => resolvePromise());
       });
+
+      for (const job of jobs.values()) {
+        if (job.workspacePath) {
+          removeWorkspace(job.workspacePath);
+          job.workspacePath = null;
+        }
+      }
 
       rmSync(appRoot, {
         recursive: true,
@@ -455,6 +468,134 @@ async function handleRequest(
     return;
   }
 
+  const workspaceRoute =
+    matchWorkspaceRoute(url.pathname);
+
+  if (workspaceRoute) {
+    const job = jobs.get(workspaceRoute.id);
+
+    if (!job) {
+      sendJson(
+        response,
+        404,
+        {
+          error: 'Job not found.',
+        },
+      );
+      return;
+    }
+
+    if (
+      job.status !== 'completed' ||
+      !job.workspacePath
+    ) {
+      sendJson(
+        response,
+        409,
+        {
+          error:
+            'Converted PBIP workspace is not available for this job.',
+        },
+      );
+      return;
+    }
+
+    if (
+      request.method === 'GET' &&
+      workspaceRoute.action === 'manifest'
+    ) {
+      const files = listWorkspaceFiles(
+        job.workspacePath,
+      );
+
+      sendJson(
+        response,
+        200,
+        {
+          projectName:
+            String(job.label ?? '')
+              .replace(/\.pbix$/i, ''),
+          files,
+          totalBytes:
+            files.reduce(
+              (sum, item) =>
+                sum + item.bytes,
+              0,
+            ),
+        },
+      );
+      return;
+    }
+
+    if (
+      request.method === 'GET' &&
+      workspaceRoute.action === 'file'
+    ) {
+      try {
+        const filePath =
+          resolveWorkspaceFile(
+            job.workspacePath,
+            url.searchParams.get('path'),
+          );
+
+        if (
+          !existsSync(filePath) ||
+          !statSync(filePath).isFile()
+        ) {
+          sendJson(
+            response,
+            404,
+            {
+              error:
+                'Converted PBIP file not found.',
+            },
+          );
+          return;
+        }
+
+        response.writeHead(
+          200,
+          securityHeaders({
+            'content-type':
+              'application/octet-stream',
+          }),
+        );
+        createReadStream(filePath).pipe(response);
+      } catch (error) {
+        sendJson(
+          response,
+          400,
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+        );
+      }
+      return;
+    }
+
+    if (
+      request.method === 'DELETE' &&
+      workspaceRoute.action === 'manifest'
+    ) {
+      removeWorkspace(
+        job.workspacePath,
+      );
+      job.workspacePath = null;
+
+      sendJson(
+        response,
+        200,
+        {
+          removed: true,
+        },
+      );
+      return;
+    }
+  }
+
   const jobRoute = matchJobRoute(url.pathname);
 
   if (jobRoute) {
@@ -645,9 +786,29 @@ function publicJob(job) {
     status: job.status,
     message: job.message,
     events: job.events,
-    workspacePath: job.workspacePath,
+    workspaceAvailable:
+      Boolean(job.workspacePath),
     startedAt: job.startedAt,
     completedAt: job.completedAt,
+  };
+}
+
+function matchWorkspaceRoute(pathname) {
+  const match =
+    /^\/api\/jobs\/([^/]+)\/workspace(?:\/(file))?$/.exec(
+      pathname,
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    id: decodeURIComponent(match[1]),
+    action:
+      match[2] === 'file'
+        ? 'file'
+        : 'manifest',
   };
 }
 

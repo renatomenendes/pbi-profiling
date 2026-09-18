@@ -127,9 +127,11 @@ O processo abre uma página em `127.0.0.1` com:
 - progresso do job;
 - abertura do runbook;
 - download local de `profile.json` e `profile.rag.jsonl`;
-- opção de preservar o PBIP temporário criado a partir de PBIX.
+- opção de salvar o PBIP convertido em uma pasta escolhida pelo usuário.
 
 A UI não usa CDN, telemetria, WinForms ou serviços externos. O navegador é responsável apenas pela seleção; arquivos PBIX e os artefatos textuais relevantes do PBIP são enviados por streaming para o servidor local em loopback. PowerShell permanece restrito à conversão PBIX/TOM, onde o Power BI Desktop é tecnicamente necessário.
+
+O workspace de conversão PBIX continua temporário internamente e não é apresentado como destino de trabalho. Após uma conversão concluída, a UI oferece **Salvar PBIP convertido**. O usuário escolhe qualquer pasta normal do Windows — inclusive a mesma pasta do PBIX original — e o navegador grava uma subpasta exclusiva como `<nome>-PBIP`, preservando todos os arquivos convertidos. Depois de uma exportação bem-sucedida, o workspace temporário é removido. Workspaces ainda não exportados também são removidos ao encerrar a aplicação local.
 
 ## Execução zero-install
 
