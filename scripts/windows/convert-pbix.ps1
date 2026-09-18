@@ -686,6 +686,11 @@ function Export-Tmdl {
         }
 
         $database = $server.Databases[0]
+
+        if (-not $database.Model -or $database.Model.Tables.Count -lt 1) {
+            throw 'The live semantic model contains no tables.'
+        }
+
         [System.IO.Directory]::CreateDirectory($temporary) | Out-Null
 
         [Microsoft.AnalysisServices.Tabular.TmdlSerializer]::SerializeDatabaseToFolder(
@@ -693,19 +698,66 @@ function Export-Tmdl {
             $temporary
         )
 
-        $files = @(Get-ChildItem -LiteralPath $temporary -File -Recurse)
+        $sourceFiles = @(
+            Get-ChildItem -LiteralPath $temporary -File -Recurse -ErrorAction Stop
+        )
+        $sourceTmdlFiles = @(
+            $sourceFiles |
+            Where-Object {
+                [System.IO.Path]::GetExtension($_.Name) -ieq '.tmdl'
+            }
+        )
 
-        if ($files.Count -eq 0) {
-            throw 'TmdlSerializer completed without writing any TMDL files.'
+        $sourceManifest = @(
+            $sourceFiles |
+            ForEach-Object {
+                $_.FullName.Substring($temporary.Length).TrimStart('\')
+            } |
+            Sort-Object
+        )
+
+        if ($sourceTmdlFiles.Count -lt 1) {
+            $sample = 'none'
+            if ($sourceManifest.Count -gt 0) {
+                $sample = (@($sourceManifest | Select-Object -First 20)) -join ', '
+            }
+
+            throw (
+                'TmdlSerializer returned without producing any .tmdl files. ' +
+                'Files written by TOM: ' + $sample
+            )
         }
 
-        if ($database.Model.Tables.Count -lt 1) {
-            throw 'The live semantic model contains no tables.'
+        $sourceMessage = (
+            'Microsoft TOM produced ' +
+            [string]$sourceTmdlFiles.Count +
+            ' TMDL file(s).'
+        )
+        Write-ProgressEvent -Phase 'tmdl-source-validated' -Message $sourceMessage
+
+        try {
+            $roundTrip = [Microsoft.AnalysisServices.Tabular.TmdlSerializer]::DeserializeDatabaseFromFolder(
+                $temporary
+            )
+
+            if (-not $roundTrip -or -not $roundTrip.Model) {
+                throw 'TOM returned no model during TMDL round-trip validation.'
+            }
+
+            if ($roundTrip.Model.Tables.Count -lt 1) {
+                throw 'TMDL round-trip contains no model tables.'
+            }
+        }
+        catch {
+            throw (
+                'TMDL source round-trip validation failed: ' +
+                $_.Exception.Message
+            )
         }
 
         [System.IO.Directory]::CreateDirectory($Destination) | Out-Null
 
-        foreach ($file in $files) {
+        foreach ($file in $sourceFiles) {
             $relative = $file.FullName.Substring($temporary.Length).TrimStart('\')
             $target = Join-Path $Destination $relative
             $parent = Split-Path -Parent $target
@@ -728,6 +780,65 @@ function Export-Tmdl {
             [System.IO.File]::WriteAllLines($databaseTmdl, $lines, $encoding)
         }
 
+        $destinationFiles = @(
+            Get-ChildItem -LiteralPath $Destination -File -Recurse -ErrorAction Stop
+        )
+        $destinationTmdlFiles = @(
+            $destinationFiles |
+            Where-Object {
+                [System.IO.Path]::GetExtension($_.Name) -ieq '.tmdl'
+            }
+        )
+
+        if ($destinationTmdlFiles.Count -ne $sourceTmdlFiles.Count) {
+            $destinationManifest = @(
+                $destinationFiles |
+                ForEach-Object {
+                    $_.FullName.Substring($Destination.Length).TrimStart('\')
+                } |
+                Sort-Object |
+                Select-Object -First 20
+            )
+
+            throw (
+                'TMDL copy verification failed. Source TMDL files: ' +
+                [string]$sourceTmdlFiles.Count +
+                '; destination TMDL files: ' +
+                [string]$destinationTmdlFiles.Count +
+                '; destination sample: ' +
+                (($destinationManifest) -join ', ')
+            )
+        }
+
+        try {
+            $destinationRoundTrip = [Microsoft.AnalysisServices.Tabular.TmdlSerializer]::DeserializeDatabaseFromFolder(
+                $Destination
+            )
+
+            if (-not $destinationRoundTrip -or -not $destinationRoundTrip.Model) {
+                throw 'TOM returned no model from the copied TMDL destination.'
+            }
+
+            if ($destinationRoundTrip.Model.Tables.Count -lt 1) {
+                throw 'Copied TMDL destination contains no model tables.'
+            }
+        }
+        catch {
+            throw (
+                'Copied TMDL round-trip validation failed: ' +
+                $_.Exception.Message
+            )
+        }
+
+        $destinationMessage = (
+            'Copied semantic-model definition validated with ' +
+            [string]$destinationTmdlFiles.Count +
+            ' TMDL file(s) and ' +
+            [string]$destinationRoundTrip.Model.Tables.Count +
+            ' table(s).'
+        )
+        Write-ProgressEvent -Phase 'tmdl-destination-validated' -Message $destinationMessage
+
         $measureSum = ($database.Model.Tables | ForEach-Object {
             $_.Measures.Count
         } | Measure-Object -Sum).Sum
@@ -736,12 +847,22 @@ function Export-Tmdl {
             $measureSum = 0
         }
 
+        $relativeTmdlFiles = @(
+            $destinationTmdlFiles |
+            ForEach-Object {
+                $_.FullName.Substring($Destination.Length).TrimStart('\')
+            } |
+            Sort-Object
+        )
+
         return [PSCustomObject]@{
             DatabaseName = [string]$database.Name
             CompatibilityLevel = [int]$database.CompatibilityLevel
             TableCount = [int]$database.Model.Tables.Count
             MeasureCount = [int]$measureSum
-            FileCount = $files.Count
+            FileCount = $destinationFiles.Count
+            TmdlFileCount = $destinationTmdlFiles.Count
+            TmdlFiles = @($relativeTmdlFiles)
         }
     }
     finally {
@@ -914,6 +1035,8 @@ $result = [ordered]@{
     visualCount = $reportInfo.VisualCount
     modelTableCount = $modelInfo.TableCount
     modelMeasureCount = $modelInfo.MeasureCount
+    tmdlFileCount = $modelInfo.TmdlFileCount
+    tmdlFiles = @($modelInfo.TmdlFiles)
     compatibilityLevel = $modelInfo.CompatibilityLevel
     desktopOpened = $true
     desktopProcessId = if ($desktopProcess) { $desktopProcess.Id } else { $null }
