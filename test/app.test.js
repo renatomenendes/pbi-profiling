@@ -145,3 +145,77 @@ test('local app is loopback-only, token-protected and profiles a PBIP path end-t
     );
   }
 });
+
+
+test('local app creates PBIX upload workspace before streaming files with realistic names', async () => {
+  const app = await startLocalApp({
+    open: false,
+  });
+
+  try {
+    const url = new URL(app.url);
+    const response = await fetch(
+      `${url.origin}/api/jobs/pbix?keepWorkspace=1&timeout=30`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'x-file-name': encodeURIComponent(
+            '[PRD]SLA_POP_Novo_Analitico.pbix',
+          ),
+          'x-pbi-profiling-token': app.token,
+        },
+        body: Buffer.from('synthetic-pbix-body'),
+      },
+    );
+
+    assert.equal(
+      response.status,
+      202,
+      await response.text(),
+    );
+
+    const payload = await response.json();
+    assert.ok(payload.jobId);
+
+    let job;
+    const deadline = Date.now() + 10_000;
+
+    while (Date.now() < deadline) {
+      const status = await fetch(
+        `${url.origin}/api/jobs/${payload.jobId}`,
+        {
+          headers: {
+            'x-pbi-profiling-token': app.token,
+          },
+        },
+      );
+
+      assert.equal(status.status, 200);
+      job = await status.json();
+
+      if (
+        job.status === 'completed' ||
+        job.status === 'failed'
+      ) {
+        break;
+      }
+
+      await new Promise((resolvePromise) => {
+        setTimeout(resolvePromise, 50);
+      });
+    }
+
+    assert.equal(job?.status, 'failed');
+    assert.doesNotMatch(
+      job.message,
+      /ENOENT|no such file or directory/i,
+    );
+    assert.match(
+      job.message,
+      /PBIX intake requires Windows/i,
+    );
+  } finally {
+    await app.close();
+  }
+});
