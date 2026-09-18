@@ -169,13 +169,15 @@ test('local app creates PBIX upload workspace before streaming files with realis
       },
     );
 
+    const responseText = await response.text();
+
     assert.equal(
       response.status,
       202,
-      await response.text(),
+      responseText,
     );
 
-    const payload = await response.json();
+    const payload = JSON.parse(responseText);
     assert.ok(payload.jobId);
 
     let job;
