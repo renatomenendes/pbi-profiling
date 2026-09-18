@@ -22,7 +22,11 @@ import {
 import { profileTarget } from '../application/profile.js';
 import { renderAppPage } from './page.js';
 import { openBrowser } from './open.js';
-import { selectLocalPowerBiTarget } from './picker.js';
+import {
+  createBrowserProjectUpload,
+  receiveBrowserProjectFile,
+  validateBrowserProjectUpload,
+} from './project-upload.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_JSON_BYTES = 64 * 1024;
@@ -45,6 +49,7 @@ export async function startLocalApp(
     join(tmpdir(), 'pbi-profiling-app-'),
   );
   const jobs = new Map();
+  const projectUploads = new Map();
   let queue = Promise.resolve();
 
   const server = createServer(
@@ -56,6 +61,7 @@ export async function startLocalApp(
           token,
           appRoot,
           jobs,
+          projectUploads,
           enqueue(task) {
             queue = queue
               .then(task)
@@ -128,6 +134,7 @@ async function handleRequest(
     token,
     appRoot,
     jobs,
+    projectUploads,
     enqueue,
   },
 ) {
@@ -161,36 +168,152 @@ async function handleRequest(
 
   if (
     request.method === 'POST' &&
-    url.pathname === '/api/picker'
+    url.pathname === '/api/projects'
   ) {
     const payload = await readJsonBody(request);
-    const kind = String(payload.kind ?? '').trim();
+    const upload = createBrowserProjectUpload(
+      appRoot,
+      payload.name,
+    );
 
-    try {
-      const selected = await selectLocalPowerBiTarget(kind);
+    projectUploads.set(
+      upload.id,
+      upload,
+    );
+
+    sendJson(
+      response,
+      201,
+      {
+        projectId: upload.id,
+      },
+    );
+    return;
+  }
+
+  const projectRoute =
+    matchProjectRoute(url.pathname);
+
+  if (projectRoute) {
+    const upload =
+      projectUploads.get(projectRoute.id);
+
+    if (!upload) {
       sendJson(
         response,
-        200,
-        selected,
-      );
-    } catch (error) {
-      const status =
-        error?.code === 'PICKER_UNAVAILABLE'
-          ? 501
-          : 400;
-
-      sendJson(
-        response,
-        status,
+        404,
         {
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
+          error: 'Staged project not found.',
         },
       );
+      return;
     }
-    return;
+
+    if (
+      request.method === 'PUT' &&
+      projectRoute.action === 'files'
+    ) {
+      try {
+        const result =
+          await receiveBrowserProjectFile(
+            request,
+            upload,
+            url.searchParams.get('path'),
+          );
+
+        sendJson(
+          response,
+          201,
+          result,
+        );
+      } catch (error) {
+        sendJson(
+          response,
+          400,
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+        );
+      }
+      return;
+    }
+
+    if (
+      request.method === 'POST' &&
+      projectRoute.action === 'validate'
+    ) {
+      try {
+        const validation =
+          validateBrowserProjectUpload(
+            upload,
+          );
+
+        sendJson(
+          response,
+          200,
+          validation,
+        );
+      } catch (error) {
+        sendJson(
+          response,
+          400,
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+        );
+      }
+      return;
+    }
+
+    if (
+      request.method === 'POST' &&
+      projectRoute.action === 'profile'
+    ) {
+      if (
+        upload.status !== 'ready' ||
+        !upload.validation?.ready
+      ) {
+        sendJson(
+          response,
+          409,
+          {
+            error:
+              'Project must be validated before profiling.',
+          },
+        );
+        return;
+      }
+
+      const job = createJob(
+        jobs,
+        appRoot,
+        upload.label,
+      );
+
+      scheduleJob(
+        job,
+        upload.root,
+        {
+          keepWorkspace: false,
+        },
+        enqueue,
+      );
+
+      sendJson(
+        response,
+        202,
+        {
+          jobId: job.id,
+        },
+      );
+      return;
+    }
   }
 
   if (
@@ -522,6 +645,22 @@ function publicJob(job) {
     workspacePath: job.workspacePath,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
+  };
+}
+
+function matchProjectRoute(pathname) {
+  const match =
+    /^\/api\/projects\/([^/]+)\/(files|validate|profile)$/.exec(
+      pathname,
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    id: decodeURIComponent(match[1]),
+    action: match[2],
   };
 }
 
