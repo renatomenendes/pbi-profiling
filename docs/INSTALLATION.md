@@ -17,13 +17,29 @@ Use the portable ZIP attached to the GitHub Release. Do not use GitHub's automat
 1. Download `pbi-profiling-v<version>-windows-portable.zip`.
 2. Download `SHA256SUMS.txt`.
 3. Verify the ZIP hash.
-4. Extract the ZIP to a user-writable folder.
-5. Run `pbi-profiling.cmd`.
+4. In Windows Explorer, right-click the ZIP and choose **Extract All**.
+5. Use the default destination or another user-writable folder.
+6. Open the extracted `pbi-profiling-v<version>-windows-portable` folder.
+7. Run `pbi-profiling.cmd`.
+
+The official ZIP stores the application files directly at the archive root. With the standard Windows **Extract All** flow, the expected layout is:
+
+```text
+C:\projetos\
+└── pbi-profiling-v1.0.1-windows-portable\
+    ├── pbi-profiling.cmd
+    ├── src\
+    ├── docs\
+    ├── schemas\
+    └── vendor\
+```
+
+There must not be a second nested `pbi-profiling-v1.0.1-windows-portable` directory.
 
 Example checksum validation in PowerShell:
 
 ```powershell
-Get-FileHash .\pbi-profiling-v1.0.0-windows-portable.zip -Algorithm SHA256
+Get-FileHash .\pbi-profiling-v1.0.1-windows-portable.zip -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -31,15 +47,10 @@ The calculated hash must match the release checksum exactly.
 
 ## Launch
 
-From Explorer:
-
-```text
-pbi-profiling.cmd
-```
-
-Or from PowerShell:
+Example:
 
 ```powershell
+Set-Location C:\projetos\pbi-profiling-v1.0.1-windows-portable
 .\pbi-profiling.cmd
 ```
 

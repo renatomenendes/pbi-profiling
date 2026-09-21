@@ -127,7 +127,7 @@ jobs:
         run: |
           node --input-type=module -e "import { writePbipFixture } from './test/fixtures/pbip.js'; writePbipFixture(process.env.FIXTURE_DIR);"
 
-      - name: Smoke test packaged runtime
+      - name: Smoke test staged runtime
         env:
           FIXTURE_DIR: ${{ runner.temp }}/release-fixture
           OUTPUT_DIR: ${{ runner.temp }}/release-output
@@ -150,3 +150,34 @@ jobs:
             echo "Forbidden development content found in release package."
             exit 1
           fi
+
+      - name: Verify standard Windows extraction layout
+        env:
+          FIXTURE_DIR: ${{ runner.temp }}/release-fixture
+          OUTPUT_DIR: ${{ runner.temp }}/extracted-output
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
+          PACKAGE_DIR="dist/${PACKAGE_BASENAME}"
+          TEST_ZIP="${RUNNER_TEMP}/${PACKAGE_BASENAME}.zip"
+          EXTRACT_ROOT="${RUNNER_TEMP}/${PACKAGE_BASENAME}"
+
+          (
+            cd "${PACKAGE_DIR}"
+            find . -type f -printf '%P\n' |
+              LC_ALL=C sort |
+              zip -X -q "${TEST_ZIP}" -@
+          )
+
+          mkdir -p "${EXTRACT_ROOT}"
+          unzip -q "${TEST_ZIP}" -d "${EXTRACT_ROOT}"
+
+          test -f "${EXTRACT_ROOT}/pbi-profiling.cmd"
+          test -f "${EXTRACT_ROOT}/src/app.js"
+          test ! -e "${EXTRACT_ROOT}/${PACKAGE_BASENAME}"
+
+          node "${EXTRACT_ROOT}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
+
+          test -s "${OUTPUT_DIR}/profile.html"
+          test -s "${OUTPUT_DIR}/profile.json"
+          test -s "${OUTPUT_DIR}/profile.rag.jsonl"
