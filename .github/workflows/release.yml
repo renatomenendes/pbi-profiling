@@ -72,7 +72,7 @@ jobs:
           test -s "${OUTPUT_DIR}/profile.json"
           test -s "${OUTPUT_DIR}/profile.rag.jsonl"
 
-      - name: Create deterministic ZIP and checksum
+      - name: Create deterministic flat ZIP and checksum
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
@@ -85,34 +85,37 @@ jobs:
           find "${PACKAGE_DIR}" -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 
           (
-            cd dist
-            find "${PACKAGE_BASENAME}" -type f -print |
+            cd "${PACKAGE_DIR}"
+            find . -type f -printf '%P\n' |
               LC_ALL=C sort |
-              zip -X -q "../release/${ASSET}" -@
+              zip -X -q "${GITHUB_WORKSPACE}/release/${ASSET}" -@
           )
 
           sha256sum "release/${ASSET}" > release/SHA256SUMS.txt
 
-      - name: Smoke test ZIP artifact
+      - name: Smoke test Windows extraction layout
         env:
           FIXTURE_DIR: ${{ runner.temp }}/release-fixture
           OUTPUT_DIR: ${{ runner.temp }}/zip-output
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           PACKAGE_BASENAME="pbi-profiling-v${VERSION}-windows-portable"
+          EXTRACT_ROOT="${RUNNER_TEMP}/${PACKAGE_BASENAME}"
 
-          mkdir -p "${RUNNER_TEMP}/release-unpacked"
-          unzip -q             "release/${PACKAGE_BASENAME}.zip"             -d "${RUNNER_TEMP}/release-unpacked"
+          mkdir -p "${EXTRACT_ROOT}"
+          unzip -q             "release/${PACKAGE_BASENAME}.zip"             -d "${EXTRACT_ROOT}"
 
-          PACKAGE_DIR="${RUNNER_TEMP}/release-unpacked/${PACKAGE_BASENAME}"
+          test -f "${EXTRACT_ROOT}/pbi-profiling.cmd"
+          test -f "${EXTRACT_ROOT}/src/app.js"
+          test ! -e "${EXTRACT_ROOT}/${PACKAGE_BASENAME}"
 
-          node "${PACKAGE_DIR}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
+          node "${EXTRACT_ROOT}/src/cli.js" profile "${FIXTURE_DIR}" --output "${OUTPUT_DIR}"
 
           test -s "${OUTPUT_DIR}/profile.html"
           test -s "${OUTPUT_DIR}/profile.json"
           test -s "${OUTPUT_DIR}/profile.rag.jsonl"
 
-          if find "${PACKAGE_DIR}" -name .git -o -name node_modules -o -name coverage | grep -q .; then
+          if find "${EXTRACT_ROOT}" -name .git -o -name node_modules -o -name coverage | grep -q .; then
             echo "Forbidden development content found in final ZIP."
             exit 1
           fi
