@@ -1,6 +1,6 @@
 {
   "name": "pbi-profiling",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local, read-only profiling and documentation for Power BI PBIP projects.",
   "type": "module",
   "main": "./src/index.js",
