@@ -4,6 +4,19 @@ All notable changes to `pbi-profiling` are documented here.
 
 The project follows Semantic Versioning.
 
+## [1.0.1] - 2026-09-21
+
+Packaging hotfix for the Windows portable distribution.
+
+### Fixed
+
+- The official portable ZIP now stores runtime files at the ZIP root instead of wrapping them in an additional `pbi-profiling-v<version>-windows-portable` directory.
+- Windows **Extract All** now produces exactly one application directory, with `pbi-profiling.cmd` directly inside it.
+- CI now reproduces the Windows extraction layout and fails if an extra nested package directory is introduced again.
+- Release smoke testing now executes the profiler from the same flat layout that end users receive after extraction.
+
+No profiling-engine, PBIP validation, HTML, JSON or RAG behavior changed.
+
 ## [1.0.0] - 2026-09-18
 
 First production release.
